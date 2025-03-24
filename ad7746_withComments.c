@@ -1,3 +1,25 @@
+// #include <math.h>   // For round()
+
+// /**
+//  * @brief Convert a pF value to the sensor's long integer offset format(Peiyu generated with help of Deepseek).
+//  * 
+//  * @param pF Capacitance value in pF (0 to 21 pF).
+//  * @param[out] error Error flag (0 = success, -1 = invalid input).
+//  * @return long Scaled integer for the sensor.
+//  */
+// long pF_to_sensor_offset(float pF, int *error) {
+//     const float MAX_PF = 21.0f;
+//     const long SCALE_FACTOR = 2048000L; // 21pF → 43,008,000
+
+//     if (pF < 0 || pF > MAX_PF) {
+//         if (error) *error = -1; // Signal invalid input
+//         return 0;
+//     }
+
+//     if (error) *error = 0; // Signal success
+//     return (long)round(pF * SCALE_FACTOR);
+// }
+
 /***************************************************************************//**
  *   @file   ad7746.c
  *   @brief  Implementation of AD7746 Driver.
