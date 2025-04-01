@@ -22,6 +22,9 @@ extern "C" {
 ad7746_dev* devices[MAX_DEVICES];
 int num_devices = 0;
 
+// /////////////////////////////////////////////////
+uint8_t addresses[] = {0x48}; // create an array to store device address
+
 // Define a struct to hold offset settings for CIN1 and CIN2
 struct CapOffsetSettings {
   float cin1_offset_pF;  // Use -1.0 for auto-calibration
@@ -269,94 +272,60 @@ void setup() {
 
   Serial.println("AD7746 Initialization complete.");
 }
+
+
 void loop() {
-  for (int i = 0; i < num_devices; i++) {  // Start from 0 instead of 1
-    uint32_t cap_raw_cin1 = 0;
-    uint32_t cap_raw_cin2 = 0;
-    uint8_t status;
-    int32_t ret;
-    unsigned long timeout;
+  uint32_t cap_raw_cin1 = ad7746_get_cap_data(devices[0], &cap_raw_cin1);
+  Serial.print('Readout is:');
+  Serial.println(cap_raw_cin1);
+  delay(500);
+  // for (int i = 0; i < num_devices; i++) {
+  //   uint32_t cap_raw_cin1 = 0;
+  //   uint32_t cap_raw_cin2 = 0;
+  //   int32_t ret;
 
-    // ===== CIN1 Measurement =====
-    timeout = millis();
-    do {
-      ret = ad7746_read_status(devices[i], &status);
-      if(ret < 0) {
-        Serial.print("[0x");
-        Serial.print(devices[i]->i2c_dev->slave_address, HEX);  // Show actual address
-        Serial.print("] Status error: ");
-        Serial.println(ret);
-        break;
-      }
-      if((millis() - timeout) > 500) {
-        Serial.print("[0x");
-        Serial.print(devices[i]->i2c_dev->slave_address, HEX);
-        Serial.println("] CIN1 timeout");
-        break;
-      }
-    } while(!(status & AD7746_STATUS_CAP_READY));
+  //   // ===== Read CIN1 =====
+  //   // Configure for CIN1
+  //   ad7746_cap cin1_config = devices[i]->setup.cap;
+  //   cin1_config.cin2 = false;
+  //   ad7746_set_cap(devices[i], cin1_config);
 
-    // ===== CIN2 Measurement =====
-    if(ret == 0) {
-      // Switch to CIN2
-      ad7746_cap new_config = devices[i]->setup.cap;
-      new_config.cin2 = true;
-      ad7746_set_cap(devices[i], new_config);
+  //   // Get CIN1 data
+  //   ret = ad7746_get_cap_data(devices[i], &cap_raw_cin1);
+    
+  //   // ===== Read CIN2 =====
+  //   if(ret == 0) {
+  //     // Configure for CIN2
+  //     ad7746_cap cin2_config = devices[i]->setup.cap;
+  //     cin2_config.cin2 = true;
+  //     ad7746_set_cap(devices[i], cin2_config);
 
-      timeout = millis();
-      do {
-        ret = ad7746_read_status(devices[i], &status);
-        if(ret < 0 || (millis() - timeout) > 500) break;
-      } while(!(status & AD7746_STATUS_CAP_READY));
-    }
+  //     // Get CIN2 data
+  //     ret = ad7746_get_cap_data(devices[i], &cap_raw_cin2);
+  //   }
 
-    // ===== Read Both Channels =====
-    if(ret == 0) {
-      // Direct register reads for both channels
-      uint8_t cap_data[3];
-      
-      // Read CIN1
-      ret = ad7746_reg_read(devices[i], 0x01, cap_data, 3);
-      if(ret == 0) {
-        cap_raw_cin1 = ((uint32_t)cap_data[0] << 16) | 
-                      ((uint32_t)cap_data[1] << 8) | 
-                       (uint32_t)cap_data[2];
-      }
-      
-      // Read CIN2
-      if(ret == 0) {
-        ret = ad7746_reg_read(devices[i], 0x01, cap_data, 3);
-        cap_raw_cin2 = ((uint32_t)cap_data[0] << 16) | 
-                      ((uint32_t)cap_data[1] << 8) | 
-                       (uint32_t)cap_data[2];
-      }
-    }
+  //   // ===== Process Results =====
+  //   if(ret == 0) {
+  //     // Convert to signed values
+  //     int32_t signed_cin1 = (cap_raw_cin1 & 0x800000) ? 
+  //                          (cap_raw_cin1 | 0xFF000000) : cap_raw_cin1;
+  //     int32_t signed_cin2 = (cap_raw_cin2 & 0x800000) ? 
+  //                          (cap_raw_cin2 | 0xFF000000) : cap_raw_cin2;
 
-    // ===== Data Processing & Output =====
-    if(ret == 0) {
-      // Convert and print both channels
-      int32_t cin1 = (cap_raw_cin1 & 0x800000) ? (cap_raw_cin1 | 0xFF000000) : cap_raw_cin1;
-      int32_t cin2 = (cap_raw_cin2 & 0x800000) ? (cap_raw_cin2 | 0xFF000000) : cap_raw_cin2;
-      
-      Serial.print("[0x");
-      Serial.print(devices[i]->i2c_dev->slave_address, HEX);
-      Serial.print("] CIN1: ");
-      Serial.print(cin1 * (8.192e-12 / 16777216.0), 6);
-      Serial.print(" F, CIN2: ");
-      Serial.print(cin2 * (8.192e-12 / 16777216.0), 6);
-      Serial.println(" F");
-    } else {
-      Serial.print("[0x");
-      Serial.print(devices[i]->i2c_dev->slave_address, HEX);
-      Serial.println("] Read error");
-    }
+  //     // Convert to picofarads (8.192pF full scale)
+  //     float cin1_pF = signed_cin1 * (8.192f / 16777216.0f);
+  //     float cin2_pF = signed_cin2 * (8.192f / 16777216.0f);
 
-    // Reset to CIN1 configuration
-    if(ret == 0) {
-      ad7746_cap reset_config = devices[i]->setup.cap;
-      reset_config.cin2 = false;
-      ad7746_set_cap(devices[i], reset_config);
-    }
-  }
-  delay(50);  // Maintain 50Hz update rate
+  //     Serial.print("CIN1: ");
+  //     Serial.print(cin1_pF, 4);
+  //     Serial.print(" pF, CIN2: ");
+  //     Serial.print(cin2_pF, 4);
+  //     Serial.println(" pF");
+  //   } else {
+  //     Serial.print("Error reading data: ");
+  //     Serial.println(ret);
+  //   }
+    
+  //   delay(100);  // Adjust based on conversion rate
+  // }
 }
