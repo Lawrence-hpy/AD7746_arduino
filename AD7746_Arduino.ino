@@ -9,6 +9,12 @@ extern "C" {
 
 #include <Wire.h>
 
+// Status register bits (AD7746_REG_STATUS = 0x0B)
+#define AD7746_STATUS_CAP_READY  (1 << 0)  // Bit 0: Capacitance data ready
+#define AD7746_STATUS_VT_READY   (1 << 1)  // Bit 1: Voltage/Temp data ready
+#define AD7746_REG_STATUS 0x0B
+
+
 // Maximum number of AD7746 devices
 #define MAX_DEVICES 4
 
@@ -21,6 +27,27 @@ struct CapOffsetSettings {
   float cin1_offset_pF;  // Use -1.0 for auto-calibration
   float cin2_offset_pF;  // Use -1.0 for auto-calibration
 };
+
+/***************************************************************************//**
+ * @brief Read AD7746 status register
+ * 
+ * @param dev - Device descriptor pointer
+ * @param[out] status - Pointer to store status value
+ * @return int32_t - Return code (0 for success, negative for errors)
+ *******************************************************************************/
+int32_t ad7746_read_status(struct ad7746_dev *dev, uint8_t *status) {
+  const uint8_t status_reg = AD7746_REG_STATUS;  // 0x0B
+  int32_t ret;
+  uint8_t reg_data;
+
+  ret = ad7746_reg_read(dev, status_reg, &reg_data, 1);
+  if(ret < 0) {
+      return ret;
+  }
+  
+  *status = reg_data;
+  return 0;
+}
 
 // /***************************************************************************//**
 //  * @brief Read current capacitance value for a channel and return in pF.
@@ -57,32 +84,14 @@ struct CapOffsetSettings {
  *******************************************************************************/
 bool initialize_ad7746(uint8_t address, ad7746_cap cap_settings, ad7746_vt vt_settings, 
                        ad7746_config config_settings, CapOffsetSettings offset_settings) {
-  // no_os_i2c_init_param i2c_init = {
-  //   .device_id = 0,
-  //   .slave_address = address,
-  //   .platform_ops = NULL
-  // };
-
-  // ad7746_setup setup = {
-  //   .cap = cap_settings,
-  //   .vt = vt_settings,
-  //   .config = config_settings,
-  //   .exc = {}
-  // };
-
-  // ad7746_init_param init_param = {
-  //   .i2c_init = i2c_init,
-  //   .id = ID_AD7746,
-  //   .setup = setup
-  // };
 
   no_os_i2c_init_param i2c_init = {0, address, NULL};
   
   ad7746_setup setup = {
     cap_settings,
     vt_settings,
+    {}, // ad7746_exc (empty initialization)
     config_settings,
-    {}
   };
 
   ad7746_init_param init_param = {i2c_init, ID_AD7746, setup};
@@ -99,54 +108,12 @@ bool initialize_ad7746(uint8_t address, ad7746_cap cap_settings, ad7746_vt vt_se
   ad7746_set_cap(dev, cap_settings);
   ad7746_set_config(dev, config_settings);
 
-  // ===== Auto-calibrate or apply user offsets =====
-  // struct iio_ch_info cin1_channel = {.ch_num = 0, .differential = false};
-  // struct iio_ch_info cin2_channel = {.ch_num = 1, .differential = false};
-
-  // // Auto-calibrate CIN1 if user offset is -1.0
-  // if (offset_settings.cin1_offset_pF < 0) {
-  //   float current_pF = read_current_capacitance(dev, cin1_channel);
-  //   if (!isnan(current_pF)) {
-  //     offset_settings.cin1_offset_pF = current_pF;
-  //   } else {
-  //     Serial.print("Auto-calibration failed for CIN1 (0x");
-  //     Serial.print(address, HEX);
-  //     Serial.println(")");
-  //     return false;
-  //   }
-  // }
-
-  // // Auto-calibrate CIN2 if user offset is -1.0
-  // if (offset_settings.cin2_offset_pF < 0) {
-  //   float current_pF = read_current_capacitance(dev, cin2_channel);
-  //   if (!isnan(current_pF)) {
-  //     offset_settings.cin2_offset_pF = current_pF;
-  //   } else {
-  //     Serial.print("Auto-calibration failed for CIN2 (0x");
-  //     Serial.print(address, HEX);
-  //     Serial.println(")");
-  //     return false;
-  //   }
-  // }
-
   // Apply offsets
   const long SCALE_FACTOR = 2048000L;
   long offset_rawcode_ch1 = offset_settings.cin1_offset_pF/SCALE_FACTOR;
   long offset_rawcode_ch2 = offset_settings.cin2_offset_pF/SCALE_FACTOR;
 
   ad7746_set_cap_offset(dev,offset_rawcode_ch1);
-
-  // auto apply_offset = [&](float pF, struct iio_ch_info channel) {
-  //   if (pF < 0) return; // Skip invalid values
-  //   char buf[16];
-  //   long raw_offset = round(pF * SCALE_FACTOR);
-  //   int len = snprintf(buf, sizeof(buf), "%ld", raw_offset);
-  //   ad7746_iio_write_offset(dev, buf, len, &channel, 0);
-  // };
-
-  // apply_offset(offset_settings.cin1_offset_pF, cin1_channel);
-  // apply_offset(offset_settings.cin2_offset_pF, cin2_channel);
-
   
   Serial.print("AD7746 at 0x");
   Serial.print(address, HEX);
@@ -156,55 +123,67 @@ bool initialize_ad7746(uint8_t address, ad7746_cap cap_settings, ad7746_vt vt_se
 }
 
 void setup() {
+  Wire.setClock(100000);  // Add before Wire.begin()
   Serial.begin(115200); // set baud rate to 115200, required by CN0552
-  delay(1000);
-  Serial.println("AD7746 Initialization...");
- 
-  // 250329: scanning connected devices using I2C,  
-  Serial.println("Start scanning connected devices using I2C...");
-  uint8_t addresses[127]; // create an array to store device address
-  byte scan_error, arduino_i2c_address; // init parameters for scanning device
-  int device_count = 0;
-  
-  for (uint8_t arduino_i2c_address = 1; arduino_i2c_address < 127; arduino_i2c_address++)
-  {
-    Wire.beginTransmission(arduino_i2c_address); // try to communicate with current address see if there's a device connected
-    scan_error = Wire.endTransmission(); //checks for acknowledgment. If no error (error == 0), the address is printed.
-    
-    if (scan_error == 0) { // if there is a device
-      addresses[device_count] = arduino_i2c_address; // store the found address to array
-      Serial.print("Device found at 0x");
-      Serial.println(arduino_i2c_address);
-      device_count++;
+  delay(500);
+  Serial.println("AD7746 Initialization...\n");
+  Serial.println("Ongoing\n");
+
+  Wire.begin();
+  Serial.println("Scanning I2C bus...");
+  for(uint8_t addr = 1; addr < 127; addr++) {
+    Wire.beginTransmission(addr);
+    byte error = Wire.endTransmission();
+    if(error == 0) {
+      Serial.print("Found device at 0x");
+      Serial.println(addr, HEX);
     }
   }
-  // change the format of address
-  char formatted_addresses[128][5]; // Stores addresses as "0xXX" strings
-  int formatted_device_count = 0;
-  formatted_device_count = device_count; 
-  for (int i = 0; i < device_count; i++) {
-    snprintf(formatted_addresses[i], 5, "0x%02X", addresses[i]);
-  }
+ 
+  // //////////////////////////////////////////////////////////////////////////////////////////////
+  // 250401: commented the scan address code, working only with on device with address 0x48 //////
+  // //////////////////////////////////////////////////////////////////////////////////////////////
 
-  // Print formatted addresses
-  Serial.println("\nFormatted addresses stored:");
-  for (int i = 0; i < formatted_device_count; i++) {
-    Serial.println(formatted_addresses[i]);
-  }
+  // // 250329: scanning connected devices using I2C,  
+  // Serial.println("Start scanning connected devices using I2C...");
+  // uint8_t addresses[127]; // create an array to store device address
+  // byte scan_error, arduino_i2c_address; // init parameters for scanning device
+  // int device_count = 0;
+  
+  // for (uint8_t arduino_i2c_address = 1; arduino_i2c_address < 127; arduino_i2c_address++)
+  // {
+  //   Wire.beginTransmission(arduino_i2c_address); // try to communicate with current address see if there's a device connected
+  //   scan_error = Wire.endTransmission(); //checks for acknowledgment. If no error (error == 0), the address is printed.
+    
+  //   if (scan_error == 0) { // if there is a device
+  //     addresses[device_count] = arduino_i2c_address; // store the found address to array
+  //     Serial.print("Device found at 0x");
+  //     Serial.println(arduino_i2c_address);
+  //     device_count++;
+  //   }
+  // }
+  // // change the format of address
+  // char formatted_addresses[128][5]; // Stores addresses as "0xXX" strings
+  // int formatted_device_count = 0;
+  // formatted_device_count = device_count; 
+  // for (int i = 0; i < device_count; i++) {
+  //   snprintf(formatted_addresses[i], 5, "0x%02X", addresses[i]);
+  // }
 
+  // // Print formatted addresses
+  // Serial.println("\nFormatted addresses stored:");
+  // for (int i = 0; i < formatted_device_count; i++) {
+  //   Serial.println(formatted_addresses[i]);
+  // }
 
+  // if (device_count == 0) {
+  //   Serial.println("No devices found.");
+  // }
 
-  if (device_count == 0) {
-    Serial.println("No devices found.");
-  }
-
-  Serial.println("Scan complete. The number of device is:");
-  Serial.println(device_count);
+  // Serial.println("Scan complete. The number of device is:");
+  // Serial.println(device_count);
   
   // initialize device settings
-
-  // uint8_t addresses[] = {0x48, 0x49, 0x4A, 0x4B};
-
   struct DeviceSettings { // the struct that stores setting for all device
     ad7746_cap cap;
     ad7746_vt vt;
@@ -265,13 +244,23 @@ void setup() {
     // ... similar for other devices
   };
 
-  for (int i = 0; i < sizeof(addresses)/sizeof(addresses[0]); i++) {
-    if (initialize_ad7746(addresses[i], device_settings[i].cap, 
-                          device_settings[i].vt, device_settings[i].config,
-                          device_settings[i].offset)) {
-      if (num_devices >= MAX_DEVICES) break;
-    }
-  }
+  // for (int i = 0; i < sizeof(addresses)/sizeof(addresses[0]); i++) { // go over all device according to the size of found address
+  //   if (initialize_ad7746(addresses[i], device_settings[i].cap, 
+  //                         device_settings[i].vt, device_settings[i].config,
+  //                         device_settings[i].offset)) {
+  //     if (num_devices >= MAX_DEVICES) break;
+  //   }
+  // }
+
+
+  // //////////////////////////////////////////////////////////////////////////////////////////////
+  // init only default address -x48, should be commented if the address scaning code is uncommented
+  // //////////////////////////////////////////////////////////////////////////////////////////////
+  num_devices = 1; 
+  uint8_t addresses[] = {0x48}; // create an array to store device address
+  initialize_ad7746(addresses[0], device_settings[0].cap, 
+                            device_settings[0].vt, device_settings[0].config,
+                            device_settings[0].offset);
 
   if (num_devices == 0) {
     Serial.println("No AD7746 devices found!");
@@ -281,49 +270,93 @@ void setup() {
   Serial.println("AD7746 Initialization complete.");
 }
 void loop() {
-  for (int i = 0; i < num_devices; i++) {
+  for (int i = 0; i < num_devices; i++) {  // Start from 0 instead of 1
     uint32_t cap_raw_cin1 = 0;
     uint32_t cap_raw_cin2 = 0;
-    int32_t result_cin1 = ad7746_get_cap_data(devices[i], &cap_raw_cin1);
-    int32_t result_cin2 = ad7746_get_cap_data(devices[i], &cap_raw_cin2);
+    uint8_t status;
+    int32_t ret;
+    unsigned long timeout;
 
-    if (result_cin1 == 0 && result_cin2 == 0) {
-      // Raw value is 24-bit signed (2's complement)
-      int32_t signed_cap_cin1 = (cap_raw_cin1 & 0xFFFFFF);
-      if (signed_cap_cin1 & 0x800000) {
-        signed_cap_cin1 |= 0xFF000000; // Sign extend to 32 bits
+    // ===== CIN1 Measurement =====
+    timeout = millis();
+    do {
+      ret = ad7746_read_status(devices[i], &status);
+      if(ret < 0) {
+        Serial.print("[0x");
+        Serial.print(devices[i]->i2c_dev->slave_address, HEX);  // Show actual address
+        Serial.print("] Status error: ");
+        Serial.println(ret);
+        break;
       }
-
-      int32_t signed_cap_cin2 = (cap_raw_cin2 & 0xFFFFFF);
-      if (signed_cap_cin2 & 0x800000) {
-        signed_cap_cin2 |= 0xFF000000; // Sign extend to 32 bits
+      if((millis() - timeout) > 500) {
+        Serial.print("[0x");
+        Serial.print(devices[i]->i2c_dev->slave_address, HEX);
+        Serial.println("] CIN1 timeout");
+        break;
       }
+    } while(!(status & AD7746_STATUS_CAP_READY));
 
-      // Convert to farads: Full scale = 8.192pF => LSB = 8.192 / 2^24 pF
-      float capacitance_cin1 = signed_cap_cin1 * (8.192e-12f / 16777216.0f);
-      float capacitance_cin2 = signed_cap_cin2 * (8.192e-12f / 16777216.0f);
+    // ===== CIN2 Measurement =====
+    if(ret == 0) {
+      // Switch to CIN2
+      ad7746_cap new_config = devices[i]->setup.cap;
+      new_config.cin2 = true;
+      ad7746_set_cap(devices[i], new_config);
 
-      // Get current time (in milliseconds)
-      unsigned long millis_now = millis();
-      unsigned long secs = millis_now / 1000;
-      unsigned long msecs = millis_now % 1000;
+      timeout = millis();
+      do {
+        ret = ad7746_read_status(devices[i], &status);
+        if(ret < 0 || (millis() - timeout) > 500) break;
+      } while(!(status & AD7746_STATUS_CAP_READY));
+    }
 
-      Serial.print("[Device ");
-      Serial.print(i);
-      Serial.print(" | Time: ");
-      Serial.print(secs);
-      Serial.print(".");
-      Serial.print(msecs);
-      Serial.print(" s] Capacitance (CIN1) = ");
-      Serial.print(capacitance_cin1, 15); // Print with high precision
-      Serial.print(" F, Capacitance (CIN2) = ");
-      Serial.print(capacitance_cin2, 15); // Print with high precision
+    // ===== Read Both Channels =====
+    if(ret == 0) {
+      // Direct register reads for both channels
+      uint8_t cap_data[3];
+      
+      // Read CIN1
+      ret = ad7746_reg_read(devices[i], 0x01, cap_data, 3);
+      if(ret == 0) {
+        cap_raw_cin1 = ((uint32_t)cap_data[0] << 16) | 
+                      ((uint32_t)cap_data[1] << 8) | 
+                       (uint32_t)cap_data[2];
+      }
+      
+      // Read CIN2
+      if(ret == 0) {
+        ret = ad7746_reg_read(devices[i], 0x01, cap_data, 3);
+        cap_raw_cin2 = ((uint32_t)cap_data[0] << 16) | 
+                      ((uint32_t)cap_data[1] << 8) | 
+                       (uint32_t)cap_data[2];
+      }
+    }
+
+    // ===== Data Processing & Output =====
+    if(ret == 0) {
+      // Convert and print both channels
+      int32_t cin1 = (cap_raw_cin1 & 0x800000) ? (cap_raw_cin1 | 0xFF000000) : cap_raw_cin1;
+      int32_t cin2 = (cap_raw_cin2 & 0x800000) ? (cap_raw_cin2 | 0xFF000000) : cap_raw_cin2;
+      
+      Serial.print("[0x");
+      Serial.print(devices[i]->i2c_dev->slave_address, HEX);
+      Serial.print("] CIN1: ");
+      Serial.print(cin1 * (8.192e-12 / 16777216.0), 6);
+      Serial.print(" F, CIN2: ");
+      Serial.print(cin2 * (8.192e-12 / 16777216.0), 6);
       Serial.println(" F");
     } else {
-      Serial.print("Failed to read capacitance from device ");
-      Serial.println(i);
+      Serial.print("[0x");
+      Serial.print(devices[i]->i2c_dev->slave_address, HEX);
+      Serial.println("] Read error");
+    }
+
+    // Reset to CIN1 configuration
+    if(ret == 0) {
+      ad7746_cap reset_config = devices[i]->setup.cap;
+      reset_config.cin2 = false;
+      ad7746_set_cap(devices[i], reset_config);
     }
   }
-
-  delay(50); // Read every 100 ms
+  delay(50);  // Maintain 50Hz update rate
 }
