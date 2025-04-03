@@ -108,5 +108,5 @@ void loop() {
     Serial.println(cap_pf, 6);
   }
 
-  delay(200);
+  delay(20000);
 }
