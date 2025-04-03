@@ -321,7 +321,7 @@
      delay = ret;
  
      c = desc->setup.config;
-     c.md = AD7746_MODE_SINGLE;
+    //  c.md = AD7746_MODE_SINGLE; // 250402: commented for now
  
      if (_configdiff(&desc->setup.config, &c)) {
          ret = ad7746_set_config(desc, c);

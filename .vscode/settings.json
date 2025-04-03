@@ -2,6 +2,8 @@
     "files.associations": {
         "no_os_alloc.h": "c",
         "math.h": "c",
-        "stdint.h": "c"
+        "stdint.h": "c",
+        "ad7746_withcomments.c": "cpp",
+        "compare": "cpp"
     }
 }

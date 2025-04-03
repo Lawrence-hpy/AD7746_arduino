@@ -1,5 +1,39 @@
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include <stdio.h>
+#include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
+
+// Declare C-linkage debug functions provided by debug_print.cpp
+void debug_print(const char* msg);
+void debug_print_hex(uint32_t val);
+
+// Replace macros
+#define DEBUG_PRINT(msg)        debug_print(msg)
+#define DEBUG_PRINT_HEX(val)    debug_print_hex(val)
+
+
+
+
+#ifdef __cplusplus
+}
+#endif
+
+#ifdef __cplusplus
+// #include <Arduino.h>
+#define DEBUG_PRINT(msg)        Serial.println(F(msg))
+#define DEBUG_PRINT_HEX(val)    do { Serial.print(F("0x")); Serial.println(val, HEX); } while (0)
+#else
+#define DEBUG_PRINT(msg)
+#define DEBUG_PRINT_HEX(val)
+#endif
+
+
+
+
 extern void debug_log(const char*, uint8_t);
 // #include <math.h>   // For round()
 
@@ -562,18 +596,18 @@ extern void debug_log(const char*, uint8_t);
      return 0;
  }
  
-//  /***************************************************************************//**
-//   * @brief Waits until a conversion on the capacitive channel has been
-//   *        finished and returns the output data.
-//   *
-//   * @param dev - Device descriptor pointer.
-//   * @param cap_data - The content of the Capacitive Data register.
-//   *
-//   * @return return code.
-//   *         Example: -EINVAL - Wrong input values.
-//   *                  -EIO - I2C Communication error.
-//   *                  0 - No errors encountered.
-//  *******************************************************************************/
+ /***************************************************************************//**
+  * @brief Waits until a conversion on the capacitive channel has been
+  *        finished and returns the output data.
+  *
+  * @param dev - Device descriptor pointer.
+  * @param cap_data - The content of the Capacitive Data register.
+  *
+  * @return return code.
+  *         Example: -EINVAL - Wrong input values.
+  *                  -EIO - I2C Communication error.
+  *                  0 - No errors encountered.
+ *******************************************************************************/
 //  int32_t ad7746_get_cap_data(struct ad7746_dev *dev, uint32_t *cap_data)
 //  {
 //      int32_t ret;
@@ -626,44 +660,52 @@ int32_t ad7746_get_cap_data(struct ad7746_dev *dev, uint32_t *cap_data)
 {
     int32_t ret;
 
-    // Validate input parameters
-    if (!dev || !cap_data)
-        return -EINVAL; // Return error if device pointer or data pointer is invalid
+    debug_print("[CHECKPOINT 1] Entering get_cap_data");
 
-    // Clear the buffer
+    if (!dev || !cap_data) {
+        debug_print("[ERROR] Null pointer in get_cap_data");
+        return -EINVAL;
+    }
+
     memset(dev->buf, 0, 3);
 
-    // Wait until the capacitive data is ready
+    debug_print("[CHECKPOINT 2] Starting STATUS polling");
+
     dev->buf[0] = AD7746_STATUS_RDYCAP_MSK;
-    int tries = 1000;
-    while ((dev->buf[0] & AD7746_STATUS_RDYCAP_MSK) && tries--) {
+    uint32_t timeout = 0;
+    while (dev->buf[0] & AD7746_STATUS_RDYCAP_MSK) {
         ret = ad7746_reg_read(dev, AD7746_REG_STATUS, dev->buf, 1);
-        if (ret < 0)
+        if (ret < 0) {
+            debug_print("[ERROR] Failed to read STATUS register");
             return ret;
-        debug_log("Polling STATUS", dev->buf[0]);
-        no_os_mdelay(1);
-    }
-    if (tries <= 0) {
-        debug_log("Timeout", 0xFF);
-        return -EIO;
+        }
+
+        timeout++;
+        if (timeout > 100000) {
+            debug_print("[ERROR] Timeout waiting for RDYCAP to clear");
+            return -EIO;
+        }
     }
 
-    // Read the capacitive data
+    debug_print("[CHECKPOINT 3] RDYCAP cleared. Reading data...");
+
     ret = ad7746_reg_read(dev, AD7746_REG_CAP_DATA_HIGH, dev->buf, 3);
-    if (ret < 0)
-        return ret; // Return error if read fails
+    if (ret < 0) {
+        debug_print("[ERROR] Failed to read CAP_DATA");
+        return ret;
+    }
 
-    // Combine the 3-byte data into a 32-bit value
     *cap_data = ((uint32_t)dev->buf[0] << 16) |
-            ((uint32_t)dev->buf[1] << 8) |
-            dev->buf[0];
+                ((uint32_t)dev->buf[1] << 8) |
+                dev->buf[2];
 
-    // Reset the mode to idle if in single conversion mode
-    if (dev->setup.config.md == AD7746_MODE_SINGLE)
-        dev->setup.config.md = AD7746_MODE_IDLE;
+    debug_print("[CHECKPOINT 4] Data read successfully");
 
     return 0;
 }
+
+
+
 
  
  /***************************************************************************//**
