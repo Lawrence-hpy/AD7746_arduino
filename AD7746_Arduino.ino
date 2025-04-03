@@ -66,14 +66,65 @@ void setup() {
   ad7746_reg_write(adc, AD7746_REG_CAP_SETUP, &cap_setup, 1);
   ad7746_reg_write(adc, AD7746_REG_EXC_SETUP, &exc_setup, 1);
   // ad7746_reg_write(adc, AD7746_REG_CONFIGURATION, &config, 1);
-  // ad7746_reg_write(adc, AD7746_REG_CAP_DAC_A, &cap_dac, 1);
+  // ad7746_reg_write(adc, AD7746_REG_CAP_DAC_A, &cap_dac, 1);  
+
+  // --- CAP DAC A ---
+  ad7746_set_cap_dac_a(adc, true, 0x42); 
+  Serial.println("[INIT] CAP DAC A set");
+  // ////////////// CAPDAC lookup table //////////////////////////
+  //   DAC Code (Hex)	Decimal	Cap Shift (pF)
+  // 0x00	0	0.000 pF
+  // 0x10	16	2.646 pF
+  // 0x1E	30	4.961 pF
+  // 0x20	32	5.291 pF
+  // 0x2A	42	6.944 pF
+  // 0x2F	47	7.771 pF
+  // 0x35	53	8.765 pF
+  // 0x3F	63	10.417 pF
+  // 0x45	69	11.412 pF
+  // 0x4B	75	12.407 pF
+  // 0x50	80	13.228 pF
+  // 0x55	85	14.055 pF
+  // 0x5A	90	14.882 pF
+  // 0x60	96	15.874 pF
+  // 0x66	102	16.867 pF
+  // 0x6C	108	17.860 pF
+  // 0x72	114	18.854 pF
+  // 0x78	120	19.847 pF
+  // 0x7F	127	21.000 pF
+  // ///////////////////////////////////////////////////////////////////////////////////////
+
+  // Target offset in pF
+  float desired_offset_pf = 0.0f;
+
+  // Convert to 24-bit signed integer
+  int32_t offset_24bit = (int32_t)(desired_offset_pf / 0.000000488f);  // 4pF / 488aF
+
+  // Sanity clamp: make sure it’s in ±2^23 range
+  if (offset_24bit > 0x7FFFFF) offset_24bit = 0x7FFFFF;
+  if (offset_24bit < -0x800000) offset_24bit = -0x800000;
+
+  // Extract top 16 bits (signed!)
+  int16_t offset_16bit = (int16_t)(offset_24bit >> 8);
+
+  // Write
+  ret = ad7746_set_cap_offset(adc, offset_16bit);
+
+  // Debug print
+  if (ret < 0) {
+    Serial.print("[ERROR] Failed to set CAP offset: ");
+    Serial.println(ret);
+  } else {
+    float actual_offset_pf = (offset_16bit * 256.0f) * 0.000000488f;
+    Serial.print("[INIT] CAP offset set to ");
+    Serial.print(actual_offset_pf, 6);
+    Serial.print(" pF (reg = 0x");
+    Serial.print((uint16_t)offset_16bit, HEX);
+    Serial.println(")");
+  }
 
 
   Serial.println("[INIT] AD7746 init done.");
-
-  // Optional: set CAP DAC A
-  ad7746_set_cap_dac_a(adc, true, 0x42);
-  Serial.println("[INIT] CAP DAC A set.");
 }
 
 
@@ -82,21 +133,21 @@ void loop() {
   uint32_t temperature = 0;
   int32_t ret;
 
-  Serial.println("in the loop");
+  // Serial.println("in the loop");
 
-  // code for debug
-  Serial.println("Register dump:");
+//   // code for debug
+//   Serial.println("Register dump:");
 
-  for (uint8_t addr = 0x00; addr <= 0x0F; addr++) {
-    uint8_t val = 0;
-    ad7746_reg_read(adc, addr, &val, 1);
-    Serial.print("Reg 0x");
-    Serial.print(addr, HEX);
-    Serial.print(": 0x");
-    Serial.println(val, HEX);
-  }
+//   for (uint8_t addr = 0x00; addr <= 0x0F; addr++) {
+//     uint8_t val = 0;
+//     ad7746_reg_read(adc, addr, &val, 1);
+//     Serial.print("Reg 0x");
+//     Serial.print(addr, HEX);
+//     Serial.print(": 0x");
+//     Serial.println(val, HEX);
+//   }
 
-// debug end
+// // debug end
 
   ret = ad7746_get_cap_data(adc, &capData);
   if (ret != 0) {
@@ -108,5 +159,24 @@ void loop() {
     Serial.println(cap_pf, 6);
   }
 
-  delay(200);
+  Serial.print("Raw CAP code: 0x");
+  Serial.println(capData & 0xFFFFFF, HEX);
+
+
+  // debug begin --- Read back CAP offset from hardware ---
+  uint8_t offset_buf[2] = {0};
+  ad7746_reg_read(adc, AD7746_REG_CAP_OFFH, offset_buf, 2);
+
+  int16_t read_offset_code = ((int16_t)offset_buf[0] << 8) | offset_buf[1];
+  float read_offset_pf = ((int32_t)read_offset_code << 8) * 0.000000488f;
+
+  Serial.print("Offset reg: 0x");
+  Serial.print(read_offset_code, HEX);
+  Serial.print(" → ");
+  Serial.print(read_offset_pf, 6);
+  Serial.println(" pF");
+  // debug end
+
+
+  delay(20000);
 }
