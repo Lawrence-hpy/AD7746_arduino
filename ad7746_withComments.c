@@ -608,41 +608,41 @@ extern void debug_log(const char*, uint8_t);
   *                  -EIO - I2C Communication error.
   *                  0 - No errors encountered.
  *******************************************************************************/
-//  int32_t ad7746_get_cap_data(struct ad7746_dev *dev, uint32_t *cap_data)
-//  {
-//      int32_t ret;
+ int32_t ad7746_get_cap_data(struct ad7746_dev *dev, uint32_t *cap_data)
+ {
+     int32_t ret;
  
-//      // Validate input parameters
-//      if (!dev || !cap_data)
-//          return -EINVAL; // Return error if device pointer or data pointer is invalid
+     // Validate input parameters
+     if (!dev || !cap_data)
+         return -EINVAL; // Return error if device pointer or data pointer is invalid
  
-//      // Clear the buffer
-//      memset(dev->buf, 0, 3);
+     // Clear the buffer
+     memset(dev->buf, 0, 3);
  
-//      // Wait until the capacitive data is ready
-//      dev->buf[0] = AD7746_STATUS_RDYCAP_MSK;
-//      while (dev->buf[0] & AD7746_STATUS_RDYCAP_MSK) {
-//          ret = ad7746_reg_read(dev, AD7746_REG_STATUS,	dev->buf, 1);
-//          if (ret < 0)
-//              return ret; // Return error if read fails
-//      }
+     // Wait until the capacitive data is ready
+     dev->buf[0] = AD7746_STATUS_RDYCAP_MSK;
+     while (dev->buf[0] & AD7746_STATUS_RDYCAP_MSK) {
+         ret = ad7746_reg_read(dev, AD7746_REG_STATUS,	dev->buf, 1);
+         if (ret < 0)
+             return ret; // Return error if read fails
+     }
  
-//      // Read the capacitive data
-//      ret = ad7746_reg_read(dev, AD7746_REG_CAP_DATA_HIGH, dev->buf, 3);
-//      if (ret < 0)
-//          return ret; // Return error if read fails
+     // Read the capacitive data
+     ret = ad7746_reg_read(dev, AD7746_REG_CAP_DATA_HIGH, dev->buf, 3);
+     if (ret < 0)
+         return ret; // Return error if read fails
  
-//      // Combine the 3-byte data into a 32-bit value
-//      *cap_data = ((uint32_t)dev->buf[0] << 16) |
-//              ((uint32_t)dev->buf[1] << 8) |
-//              dev->buf[0];
+     // Combine the 3-byte data into a 32-bit value
+     *cap_data = ((uint32_t)dev->buf[0] << 16) |
+             ((uint32_t)dev->buf[1] << 8) |
+             dev->buf[0];
  
-//      // Reset the mode to idle if in single conversion mode
-//      if (dev->setup.config.md == AD7746_MODE_SINGLE)
-//          dev->setup.config.md = AD7746_MODE_IDLE;
+     // Reset the mode to idle if in single conversion mode
+     if (dev->setup.config.md == AD7746_MODE_SINGLE)
+         dev->setup.config.md = AD7746_MODE_IDLE;
  
-//      return 0;
-//  }
+     return 0;
+ }
 
 /***************************************************************************//**
   * @brief Waits until a conversion on the capacitive channel has been
@@ -656,53 +656,53 @@ extern void debug_log(const char*, uint8_t);
   *                  -EIO - I2C Communication error.
   *                  0 - No errors encountered.
  *******************************************************************************/
-int32_t ad7746_get_cap_data(struct ad7746_dev *dev, uint32_t *cap_data)
-{
-    int32_t ret;
+// int32_t ad7746_get_cap_data(struct ad7746_dev *dev, uint32_t *cap_data)
+// {
+//     int32_t ret;
 
-    debug_print("[CHECKPOINT 1] Entering get_cap_data");
+//     debug_print("[CHECKPOINT 1] Entering get_cap_data");
 
-    if (!dev || !cap_data) {
-        debug_print("[ERROR] Null pointer in get_cap_data");
-        return -EINVAL;
-    }
+//     if (!dev || !cap_data) {
+//         debug_print("[ERROR] Null pointer in get_cap_data");
+//         return -EINVAL;
+//     }
 
-    memset(dev->buf, 0, 3);
+//     memset(dev->buf, 0, 3);
 
-    debug_print("[CHECKPOINT 2] Starting STATUS polling");
+//     debug_print("[CHECKPOINT 2] Starting STATUS polling");
 
-    dev->buf[0] = AD7746_STATUS_RDYCAP_MSK;
-    uint32_t timeout = 0;
-    while (dev->buf[0] & AD7746_STATUS_RDYCAP_MSK) {
-        ret = ad7746_reg_read(dev, AD7746_REG_STATUS, dev->buf, 1);
-        if (ret < 0) {
-            debug_print("[ERROR] Failed to read STATUS register");
-            return ret;
-        }
+//     dev->buf[0] = AD7746_STATUS_RDYCAP_MSK;
+//     uint32_t timeout = 0;
+//     while (dev->buf[0] & AD7746_STATUS_RDYCAP_MSK) {
+//         ret = ad7746_reg_read(dev, AD7746_REG_STATUS, dev->buf, 1);
+//         if (ret < 0) {
+//             debug_print("[ERROR] Failed to read STATUS register");
+//             return ret;
+//         }
 
-        timeout++;
-        if (timeout > 100000) {
-            debug_print("[ERROR] Timeout waiting for RDYCAP to clear");
-            return -EIO;
-        }
-    }
+//         timeout++;
+//         if (timeout > 100000) {
+//             debug_print("[ERROR] Timeout waiting for RDYCAP to clear");
+//             return -EIO;
+//         }
+//     }
 
-    debug_print("[CHECKPOINT 3] RDYCAP cleared. Reading data...");
+//     debug_print("[CHECKPOINT 3] RDYCAP cleared. Reading data...");
 
-    ret = ad7746_reg_read(dev, AD7746_REG_CAP_DATA_HIGH, dev->buf, 3);
-    if (ret < 0) {
-        debug_print("[ERROR] Failed to read CAP_DATA");
-        return ret;
-    }
+//     ret = ad7746_reg_read(dev, AD7746_REG_CAP_DATA_HIGH, dev->buf, 3);
+//     if (ret < 0) {
+//         debug_print("[ERROR] Failed to read CAP_DATA");
+//         return ret;
+//     }
 
-    *cap_data = ((uint32_t)dev->buf[0] << 16) |
-                ((uint32_t)dev->buf[1] << 8) |
-                dev->buf[2];
+//     *cap_data = ((uint32_t)dev->buf[0] << 16) |
+//                 ((uint32_t)dev->buf[1] << 8) |
+//                 dev->buf[2];
 
-    debug_print("[CHECKPOINT 4] Data read successfully");
+//     debug_print("[CHECKPOINT 4] Data read successfully");
 
-    return 0;
-}
+//     return 0;
+// }
 
 
 

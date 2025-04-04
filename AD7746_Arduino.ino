@@ -82,21 +82,21 @@ void loop() {
   uint32_t temperature = 0;
   int32_t ret;
 
-  Serial.println("in the loop");
+  // Serial.println("in the loop");
 
-  // code for debug
-  Serial.println("Register dump:");
+//   // code for debug
+//   Serial.println("Register dump:");
 
-  for (uint8_t addr = 0x00; addr <= 0x0F; addr++) {
-    uint8_t val = 0;
-    ad7746_reg_read(adc, addr, &val, 1);
-    Serial.print("Reg 0x");
-    Serial.print(addr, HEX);
-    Serial.print(": 0x");
-    Serial.println(val, HEX);
-  }
+//   for (uint8_t addr = 0x00; addr <= 0x0F; addr++) {
+//     uint8_t val = 0;
+//     ad7746_reg_read(adc, addr, &val, 1);
+//     Serial.print("Reg 0x");
+//     Serial.print(addr, HEX);
+//     Serial.print(": 0x");
+//     Serial.println(val, HEX);
+//   }
 
-// debug end
+// // debug end
 
   ret = ad7746_get_cap_data(adc, &capData);
   if (ret != 0) {
@@ -108,5 +108,10 @@ void loop() {
     Serial.println(cap_pf, 6);
   }
 
-  delay(20000);
+  // delay(25);
+  // Print current time in seconds with 6 decimal places
+  unsigned long micros_now = micros();
+  float time_sec = micros_now / 1e6;
+  Serial.print("TIME:");
+  Serial.println(time_sec, 6);  // e.g., TIME:3.152365
 }
