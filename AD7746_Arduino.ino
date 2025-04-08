@@ -10,7 +10,8 @@ extern "C"{
 //   #include "platform_support/uart_platform.h"
 // }
 
-ad7746_dev *adc;
+ad7746_dev *adc; // Global Device Pointer
+// ad7746_iio_dev *iio_dev = NULL; // Global IIO Device Pointer
 
 void setup() {
   Serial.begin(115200);
@@ -20,7 +21,7 @@ void setup() {
 
   // I2C setup
   no_os_i2c_init_param i2c_init;
-  i2c_init.max_speed_hz = 100000;
+  i2c_init.max_speed_hz = 00000;
   i2c_init.slave_address = AD7746_ADDRESS;
   i2c_init.platform_ops = NULL;
   i2c_init.extra = NULL;
@@ -31,7 +32,7 @@ void setup() {
   init_param.id = ID_AD7746;
 
   init_param.setup.cap.capen = true;
-  init_param.setup.cap.cin2 = false;
+  init_param.setup.cap.cin2 = true;
   init_param.setup.cap.capdiff = false;
   init_param.setup.cap.capchop = true;
 
@@ -41,11 +42,11 @@ void setup() {
   // init_param.setup.vt.vtshort = false;
   // init_param.setup.vt.vtchop = true;
 
-  init_param.setup.exc.clkctrl = false;
+  init_param.setup.exc.clkctrl = true;
   init_param.setup.exc.excon = true;
-  init_param.setup.exc.excb = AD7746_EXC_PIN_DISABLED;
+  init_param.setup.exc.excb = AD7746_EXC_PIN_NORMAL;
   init_param.setup.exc.exca = AD7746_EXC_PIN_NORMAL;
-  init_param.setup.exc.exclvl = AD7746_EXCLVL_1_DIV_8;
+  init_param.setup.exc.exclvl = AD7746_EXCLVL_4_DIV_8;
 
   init_param.setup.config.vtf = 0;
   init_param.setup.config.capf = 0;
@@ -58,22 +59,56 @@ void setup() {
     while (1);
   }
 
-  uint8_t cap_setup = 0x81;  // CAPEN = 1, use CIN1
-  uint8_t exc_setup = 0x8A;  // EXCA enabled, EXCLVL = VDD (10)
-  uint8_t config    = 0x01;  // Continuous conversion
-  uint8_t cap_dac   = 0x00;  // No offset (you can change this)
-
-  ad7746_reg_write(adc, AD7746_REG_CAP_SETUP, &cap_setup, 1);
-  ad7746_reg_write(adc, AD7746_REG_EXC_SETUP, &exc_setup, 1);
-  // ad7746_reg_write(adc, AD7746_REG_CONFIGURATION, &config, 1);
-  // ad7746_reg_write(adc, AD7746_REG_CAP_DAC_A, &cap_dac, 1);
-
 
   Serial.println("[INIT] AD7746 init done.");
 
+  // // Initialize IIO Device, not sure if it is repeated. 
+
+  // struct ad7746_iio_init_param iio_init_param;
+  // iio_init_param.ad7746_initial = &init_param;
+
+  // ret = ad7746_iio_init(&iio_dev, &iio_init_param);
+  // if (ret != 0) {
+  //     Serial.println("IIO init failed");
+  //     while(1);
+  // }
+
   // Optional: set CAP DAC A
-  ad7746_set_cap_dac_a(adc, true, 0x42);
+  ret = ad7746_set_cap_dac_a(adc, true, 0x42);
+  if (ret < 0){
+    Serial.println("DACA setting failed");
+    while (1);
+  }
   Serial.println("[INIT] CAP DAC A set.");
+
+  // Update IIO driver's capdac array to match hardware
+  // if (iio_dev) {
+  //   iio_dev->capdac[0][0] = AD7746_CAPDAC_DACEN_MSK | (0x42 & AD7746_CAPDAC_DACP_MSK);
+  //   iio_dev->capdac_set = 0; // Mark DAC settings as applied for channel 0
+  // }
+
+  struct iio_ch_info ch_info;
+  ch_info.ch_num = 0;
+  ch_info.type = IIO_CAPACITANCE;
+  ch_info.differential = 0;
+  ch_info.address = 0;
+
+
+  // ret = ad7746_iio_write_offset(adc, offset_buf, strlen(offset_buf), &ch_info, 0);
+  // if (ret >= 0) {
+  //   Serial.println("4pF offset set successfully!");
+  // } else {
+  //   Serial.print("Failed to set offset. Code: ");
+  //   Serial.println(ret);
+  // }
+
+  const char* offset_str = "8192000"; // 4.0pF → 8192000 (based on scale factor)
+  ret = ad7746_iio_write_offset(adc, (char*)offset_str, strlen(offset_str), &ch_info, 0);
+  if (ret < 0) {
+      Serial.print(F("Failed to set offset. Code: "));
+      Serial.println(ret);
+  }
+
 }
 
 

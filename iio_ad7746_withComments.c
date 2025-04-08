@@ -43,6 +43,21 @@
  #include "no_os_alloc.h"
  #include "ad7746.h"
  #include <string.h>
+
+ #ifdef __cplusplus
+ extern "C" {
+ #endif
+ 
+ void debug_print(const char* msg);
+ void debug_print_hex(uint32_t val);
+ 
+ #define DEBUG_PRINT(msg)        debug_print(msg)
+ #define DEBUG_PRINT_HEX(val)    debug_print_hex(val)
+ 
+ #ifdef __cplusplus
+ }
+ #endif
+ 
  
  /***************************************************************************//**
   * @brief Read a register from the AD7746 device.
@@ -448,55 +463,121 @@
   *         Example: -EINVAL - Wrong input values.
   *                  Number of bytes processed.
  *******************************************************************************/
- static int ad7746_iio_write_offset(void *device, char *buf, uint32_t len,
-                    const struct iio_ch_info *channel,
-                    intptr_t priv)
- {
-     struct ad7746_iio_dev *iiodev = (struct ad7746_iio_dev *)device;
-     struct ad7746_dev *desc = (struct ad7746_dev *)iiodev->ad7746_dev;
-     int32_t val, ret;
-     bool en;
-     uint8_t code;
+//  int ad7746_iio_write_offset(void *device, char *buf, uint32_t len,
+//                     const struct iio_ch_info *channel,
+//                     intptr_t priv) // static' was removed
+//  {
+//      struct ad7746_iio_dev *iiodev = (struct ad7746_iio_dev *)device;
+//      struct ad7746_dev *desc = (struct ad7746_dev *)iiodev->ad7746_dev;
+//      int32_t val, ret;
+//      bool en;
+//      uint8_t code;
  
-     ret = iio_parse_value(buf, IIO_VAL_INT, &val, NULL);
-     if (ret < 0)
-         return ret;
+//      ret = iio_parse_value(buf, IIO_VAL_INT, &val, NULL);
+//      if (ret < 0)
+//          return ret;
  
-     if (val < 0 || val > 43008000) { /* 21pF */
-         return -EINVAL;
-     }
+//      if (val < 0 || val > 43008000) { /* 21pF */
+//          return -EINVAL;
+//      }
  
-     /*
-     * CAPDAC Scale = 21pF_typ / 127
-     * CIN Scale = 8.192pF / 2^24
-     * Offset Scale = CAPDAC Scale / CIN Scale = 338646
-     */
+//      /*
+//      * CAPDAC Scale = 21pF_typ / 127
+//      * CIN Scale = 8.192pF / 2^24
+//      * Offset Scale = CAPDAC Scale / CIN Scale = 338646
+//      */
  
-     val /= 338646;
+//      val /= 338646;
  
-     en = val > 0;
-     code = en ? val : 0;
-     iiodev->capdac[channel->ch_num][channel->differential] =
-         en ? (code & AD7746_CAPDAC_DACP_MSK) | AD7746_CAPDAC_DACEN_MSK : 0;
+//      en = val > 0;
+//      code = en ? val : 0;
+//      iiodev->capdac[channel->ch_num][channel->differential] =
+//          en ? (code & AD7746_CAPDAC_DACP_MSK) | AD7746_CAPDAC_DACEN_MSK : 0;
  
-     en = (bool)(iiodev->capdac[channel->ch_num][0] & AD7746_CAPDAC_DACEN_MSK);
-     code = iiodev->capdac[channel->ch_num][0] & AD7746_CAPDAC_DACP_MSK;
-     ret = ad7746_set_cap_dac_a(desc, en, code);
-     if (ret < 0)
-         return ret;
+//      en = (bool)(iiodev->capdac[channel->ch_num][0] & AD7746_CAPDAC_DACEN_MSK);
+//      code = iiodev->capdac[channel->ch_num][0] & AD7746_CAPDAC_DACP_MSK;
+//      ret = ad7746_set_cap_dac_a(desc, en, code);
+//      if (ret < 0)
+//          return ret;
  
-     en = (bool)(iiodev->capdac[channel->ch_num][1] & AD7746_CAPDAC_DACEN_MSK);
-     code = iiodev->capdac[channel->ch_num][1] & AD7746_CAPDAC_DACP_MSK;
-     ret = ad7746_set_cap_dac_b(desc, en, code);
-     if (ret < 0)
-         return ret;
+//      en = (bool)(iiodev->capdac[channel->ch_num][1] & AD7746_CAPDAC_DACEN_MSK);
+//      code = iiodev->capdac[channel->ch_num][1] & AD7746_CAPDAC_DACP_MSK;
+//      ret = ad7746_set_cap_dac_b(desc, en, code);
+//      if (ret < 0)
+//          return ret;
  
-     iiodev->capdac_set = channel->ch_num;
+//      iiodev->capdac_set = channel->ch_num;
  
-     ret = 0;
+//      ret = 0;
  
-     return len;
- }
+//      return len;
+//  }
+
+// With debug info
+int ad7746_iio_write_offset(void *device, char *buf, uint32_t len,
+    const struct iio_ch_info *channel,
+    intptr_t priv)
+{
+    DEBUG_PRINT("Raw input buffer:");
+    DEBUG_PRINT(buf);
+
+    struct ad7746_iio_dev *iiodev = (struct ad7746_iio_dev *)device;
+    struct ad7746_dev *desc = (struct ad7746_dev *)iiodev->ad7746_dev;
+    int32_t val, ret;
+    bool en;
+    uint8_t code;
+
+    DEBUG_PRINT("Parsing input offset value...");
+    ret = iio_parse_value(buf, IIO_VAL_INT, &val, NULL);
+    if (ret < 0) {
+    DEBUG_PRINT("Failed to parse offset value.");
+    DEBUG_PRINT_HEX(ret);
+    return ret;
+    }
+
+    DEBUG_PRINT("Parsed offset value:");
+    DEBUG_PRINT_HEX(val);
+
+    if (val < 0 || val > 43008000) {
+    DEBUG_PRINT("Offset out of range.");
+    return -EINVAL;
+    }
+
+    val /= 338646;
+
+    en = val > 0;
+    code = en ? val : 0;
+    iiodev->capdac[channel->ch_num][channel->differential] =
+    en ? (code & AD7746_CAPDAC_DACP_MSK) | AD7746_CAPDAC_DACEN_MSK : 0;
+
+    DEBUG_PRINT("Writing CAPDAC A...");
+    en = (bool)(iiodev->capdac[channel->ch_num][0] & AD7746_CAPDAC_DACEN_MSK);
+    code = iiodev->capdac[channel->ch_num][0] & AD7746_CAPDAC_DACP_MSK;
+    DEBUG_PRINT_HEX(code);
+    ret = ad7746_set_cap_dac_a(desc, en, code);
+    if (ret < 0) {
+    DEBUG_PRINT("Failed to write CAPDAC A.");
+    DEBUG_PRINT_HEX(ret);
+    return ret;
+    }
+
+    DEBUG_PRINT("Writing CAPDAC B...");
+    en = (bool)(iiodev->capdac[channel->ch_num][1] & AD7746_CAPDAC_DACEN_MSK);
+    code = iiodev->capdac[channel->ch_num][1] & AD7746_CAPDAC_DACP_MSK;
+    DEBUG_PRINT_HEX(code);
+    ret = ad7746_set_cap_dac_b(desc, en, code);
+    if (ret < 0) {
+    DEBUG_PRINT("Failed to write CAPDAC B.");
+    DEBUG_PRINT_HEX(ret);
+    return ret;
+    }
+
+    iiodev->capdac_set = channel->ch_num;
+
+    DEBUG_PRINT("Offset write complete.");
+    return len;
+}
+
  
  /***************************************************************************//**
   * @brief Read the sampling frequency for the channel.

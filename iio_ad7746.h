@@ -53,4 +53,9 @@ int32_t ad7746_iio_init(struct ad7746_iio_dev **iio_dev,
 			struct ad7746_iio_init_param *init_param);
 int32_t ad7746_iio_remove(struct ad7746_iio_dev *desc);
 
+int ad7746_iio_write_offset(void *device, char *buf, uint32_t len,
+	const struct iio_ch_info *channel,
+	intptr_t priv); // Peiyu added 
+
+
 #endif /** IIO_AD7746_H */
