@@ -8,3 +8,7 @@ extern "C" void debug_print_hex(uint32_t val) {
   Serial.print("0x");
   Serial.println(val, HEX);
 }
+
+extern "C" void debug_print_time(float input_time) {
+  Serial.println(input_time);
+}

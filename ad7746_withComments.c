@@ -10,10 +10,12 @@ extern "C" {
 // Declare C-linkage debug functions provided by debug_print.cpp
 void debug_print(const char* msg);
 void debug_print_hex(uint32_t val);
+void debug_print_time(float input_time);
 
 // Replace macros
 #define DEBUG_PRINT(msg)        debug_print(msg)
 #define DEBUG_PRINT_HEX(val)    debug_print_hex(val)
+#define DEBUG_PRINT_TIME(input_time)    debug_print_time(input_time)
 
 
 
@@ -26,6 +28,7 @@ void debug_print_hex(uint32_t val);
 // #include <Arduino.h>
 #define DEBUG_PRINT(msg)        Serial.println(F(msg))
 #define DEBUG_PRINT_HEX(val)    do { Serial.print(F("0x")); Serial.println(val, HEX); } while (0)
+#define DEBUG_PRINT_TIME(input_time)    Serial.println(F(input_time))
 #else
 #define DEBUG_PRINT(msg)
 #define DEBUG_PRINT_HEX(val)
@@ -616,54 +619,157 @@ extern void debug_log(const char*, uint8_t);
   *                  -EIO - I2C Communication error.
   *                  0 - No errors encountered.
  *******************************************************************************/
- int32_t ad7746_get_cap_data(struct ad7746_dev *dev, uint32_t *cap_data)
- {
-     int32_t ret;
- 
-     // Validate input parameters
-     if (!dev || !cap_data)
-         return -EINVAL; // Return error if device pointer or data pointer is invalid
- 
-     // Clear the buffer
-     memset(dev->buf, 0, 3);
- 
-     // Wait until the capacitive data is ready
-     dev->buf[0] = AD7746_STATUS_RDYCAP_MSK;
-     while (dev->buf[0] & AD7746_STATUS_RDYCAP_MSK) {
-         ret = ad7746_reg_read(dev, AD7746_REG_STATUS,	dev->buf, 1);
-         if (ret < 0)
-             return ret; // Return error if read fails
-     }
- 
-     // Read the capacitive data
-     ret = ad7746_reg_read(dev, AD7746_REG_CAP_DATA_HIGH, dev->buf, 3);
-     if (ret < 0)
-         return ret; // Return error if read fails
- 
-     // Combine the 3-byte data into a 32-bit value
-     *cap_data = ((uint32_t)dev->buf[0] << 16) |
-             ((uint32_t)dev->buf[1] << 8) |
-             dev->buf[0];
- 
-     // Reset the mode to idle if in single conversion mode
-     if (dev->setup.config.md == AD7746_MODE_SINGLE)
-         dev->setup.config.md = AD7746_MODE_IDLE;
- 
-     return 0;
- }
+//  int32_t ad7746_get_cap_data(struct ad7746_dev *dev, uint32_t *cap_data)
+//  {
+//      int32_t ret;
 
-/***************************************************************************//**
-  * @brief Waits until a conversion on the capacitive channel has been
-  *        finished and returns the output data. Peiyu's code for debugging
-  *
-  * @param dev - Device descriptor pointer.
-  * @param cap_data - The content of the Capacitive Data register.
-  *
-  * @return return code.
-  *         Example: -EINVAL - Wrong input values.
-  *                  -EIO - I2C Communication error.
-  *                  0 - No errors encountered.
- *******************************************************************************/
+//     //  unsigned long t = micros();
+//     //  float t0 = t / 1e6;
+ 
+//      // Validate input parameters
+//      if (!dev || !cap_data)
+//          return -EINVAL; // Return error if device pointer or data pointer is invalid
+
+//     //  t = micros();
+//     //  float t1 = t / 1e6;
+ 
+//      // Clear the buffer
+//      memset(dev->buf, 0, 3);
+//     //  t = micros();
+//     //  float t2 = t / 1e6;
+ 
+//      // Wait until the capacitive data is ready, Peiyu Commented trying to reduce time
+//      dev->buf[0] = AD7746_STATUS_RDYCAP_MSK;
+//      while (dev->buf[0] & AD7746_STATUS_RDYCAP_MSK) {
+//          ret = ad7746_reg_read(dev, AD7746_REG_STATUS,	dev->buf, 1);
+//          if (ret < 0)
+//              return ret; // Return error if read fails
+//      }
+//     //  t = micros();
+//     //  float t3 = t / 1e6;
+
+//      // Read the capacitive data
+//      ret = ad7746_reg_read(dev, AD7746_REG_CAP_DATA_HIGH, dev->buf, 3);
+//      if (ret < 0)
+//          return ret; // Return error if read fails
+//     //  t = micros();
+//     //  float t4 = t / 1e6;
+
+//      // Combine the 3-byte data into a 32-bit value
+//      *cap_data = ((uint32_t)dev->buf[0] << 16) |
+//              ((uint32_t)dev->buf[1] << 8) |
+//              dev->buf[0];
+//     //  t = micros();
+//     //  float t5 = t / 1e6;
+ 
+//      // Reset the mode to idle if in single conversion mode
+//      if (dev->setup.config.md == AD7746_MODE_SINGLE)
+//          dev->setup.config.md = AD7746_MODE_IDLE;
+
+//     //  t = micros();
+//     //  float t6 = t / 1e6;
+
+//     //  Print out time
+//     // DEBUG_PRINT("T1:");
+//     // DEBUG_PRINT_TIME(t1);
+//     // DEBUG_PRINT("T2:");
+//     // DEBUG_PRINT(t2);
+//     // DEBUG_PRINT("T3:");
+//     // DEBUG_PRINT(t3);
+//     // DEBUG_PRINT("T4:");
+//     // DEBUG_PRINT(t4);
+//     // DEBUG_PRINT("T5:");
+//     // DEBUG_PRINT(t5);
+    
+//     // char buf[64];
+//     // char time_str[16];
+//     // dtostrf(t0, 6, 6, time_str); snprintf(buf, sizeof(buf), "T0: %s", time_str); debug_print(buf);
+//     // dtostrf(t1, 6, 6, time_str); snprintf(buf, sizeof(buf), "T1: %s", time_str); debug_print(buf);
+//     // dtostrf(t2, 6, 6, time_str); snprintf(buf, sizeof(buf), "T2: %s", time_str); debug_print(buf);
+//     // dtostrf(t3, 6, 6, time_str); snprintf(buf, sizeof(buf), "T3: %s", time_str); debug_print(buf);
+//     // dtostrf(t4, 6, 6, time_str); snprintf(buf, sizeof(buf), "T4: %s", time_str); debug_print(buf);
+//     // dtostrf(t5, 6, 6, time_str); snprintf(buf, sizeof(buf), "T5: %s", time_str); debug_print(buf);
+//     // dtostrf(t6, 6, 6, time_str); snprintf(buf, sizeof(buf), "T6: %s", time_str); debug_print(buf);
+    
+ 
+//      return 0;
+//  }
+int32_t ad7746_get_cap_data(struct ad7746_dev *dev, uint32_t *cap_data)
+{
+    int32_t ret;
+
+    // Capture absolute time before any operation
+    unsigned long t0 = micros();
+
+    // Validate input parameters
+    if (!dev || !cap_data)
+        return -EINVAL;
+
+    unsigned long t1 = micros();
+
+    // Clear the buffer
+    memset(dev->buf, 0, 3);
+    unsigned long t2 = micros();
+
+    // Wait until the capacitive data is ready
+    dev->buf[0] = AD7746_STATUS_RDYCAP_MSK;
+    while (dev->buf[0] & AD7746_STATUS_RDYCAP_MSK) {
+        ret = ad7746_reg_read(dev, AD7746_REG_STATUS, dev->buf, 1);
+        if (ret < 0)
+            return ret;
+    }
+    unsigned long t3 = micros();
+
+    // Read the capacitive data
+    ret = ad7746_reg_read(dev, AD7746_REG_CAP_DATA_HIGH, dev->buf, 3);
+    if (ret < 0)
+        return ret;
+    unsigned long t4 = micros();
+
+    // Combine the 3-byte data into a 32-bit value
+    *cap_data = ((uint32_t)dev->buf[0] << 16) |
+                ((uint32_t)dev->buf[1] << 8) |
+                dev->buf[2];
+    unsigned long t5 = micros();
+
+    // Reset the mode to idle if in single conversion mode
+    if (dev->setup.config.md == AD7746_MODE_SINGLE)
+        dev->setup.config.md = AD7746_MODE_IDLE;
+
+    unsigned long t6 = micros();
+
+    // Debug timing output
+    char buf[64];
+    snprintf(buf, sizeof(buf), "T0: %lu us", t0); debug_print(buf);
+    snprintf(buf, sizeof(buf), "T1: %lu us", t1); debug_print(buf);
+    snprintf(buf, sizeof(buf), "T2: %lu us", t2); debug_print(buf);
+    snprintf(buf, sizeof(buf), "T3: %lu us", t3); debug_print(buf);
+    snprintf(buf, sizeof(buf), "T4: %lu us", t4); debug_print(buf);
+    snprintf(buf, sizeof(buf), "T5: %lu us", t5); debug_print(buf);
+    snprintf(buf, sizeof(buf), "T6: %lu us", t6); debug_print(buf);
+
+    // Optional: show deltas for analysis
+    snprintf(buf, sizeof(buf), "Δt_status_polling: %lu us", t3 - t2); debug_print(buf);
+    snprintf(buf, sizeof(buf), "Δt_data_read: %lu us", t4 - t3); debug_print(buf);
+    snprintf(buf, sizeof(buf), "Δt_combine: %lu us", t5 - t4); debug_print(buf);
+    snprintf(buf, sizeof(buf), "Δt_total: %lu us", t6 - t0); debug_print(buf);
+
+    return 0;
+}
+
+
+// /***************************************************************************//**
+//   * @brief Waits until a conversion on the capacitive channel has been
+//   *        finished and returns the output data. Peiyu's code for debugging
+//   *
+//   * @param dev - Device descriptor pointer.
+//   * @param cap_data - The content of the Capacitive Data register.
+//   *
+//   * @return return code.
+//   *         Example: -EINVAL - Wrong input values.
+//   *                  -EIO - I2C Communication error.
+//   *                  0 - No errors encountered.
+//  *******************************************************************************/
 // int32_t ad7746_get_cap_data(struct ad7746_dev *dev, uint32_t *cap_data)
 // {
 //     int32_t ret;

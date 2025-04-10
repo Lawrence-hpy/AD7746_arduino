@@ -11,6 +11,9 @@ extern "C"{
 // }
 
 ad7746_dev *adc;
+uint32_t capData = 0;
+uint32_t temperature = 0;
+int32_t ret;
 
 void setup() {
   Serial.begin(115200);
@@ -51,7 +54,7 @@ void setup() {
   init_param.setup.config.capf = 0;
   init_param.setup.config.md = AD7746_MODE_CONT;
 
-  int32_t ret = ad7746_init(&adc, &init_param);
+  ret = ad7746_init(&adc, &init_param);
   if (ret != 0) {
     Serial.print("AD7746 init failed: ");
     Serial.println(ret);
@@ -72,7 +75,7 @@ void setup() {
   Serial.println("[INIT] AD7746 init done.");
 
   // Optional: set CAP DAC A
-  ad7746_set_cap_dac_a(adc, true, 0x20);
+  ad7746_set_cap_dac_a(adc, true, 0x00);
   Serial.println("[INIT] CAP DAC A set.");
 }
 
@@ -98,9 +101,13 @@ void setup() {
 
 
 void loop() {
-  uint32_t capData = 0;
-  uint32_t temperature = 0;
-  int32_t ret;
+  // unsigned long micros_now = micros();
+  // float time_sec = micros_now / 1e6;
+  // Serial.print("T1:");
+  // Serial.println(time_sec, 6);
+  // uint32_t capData = 0;
+  // uint32_t temperature = 0;
+  // int32_t ret;
 
   // Serial.println("in the loop");
 
@@ -118,49 +125,84 @@ void loop() {
 
 // // debug end
 
-  uint8_t reg_val = 0;
-  ret = ad7746_reg_read(adc, AD7746_REG_CAPDACA, &reg_val, 1);
-  if (ret == 0) {
-    Serial.print("[LOOP] CAP DAC A readback: 0x");
-    Serial.println(reg_val, HEX);
+  // uint8_t reg_val = 0;
+  // ret = ad7746_reg_read(adc, AD7746_REG_CAPDACA, &reg_val, 1);
+  // if (ret == 0) {
+  //   Serial.print("[LOOP] CAP DAC A readback: 0x");
+  //   Serial.println(reg_val, HEX);
 
-    bool dac_enabled = reg_val & 0x80;
-    uint8_t dac_code = reg_val & 0x7F;
+  //   bool dac_enabled = reg_val & 0x80;
+  //   uint8_t dac_code = reg_val & 0x7F;
 
-    Serial.print("[LOOP] Enable bit: ");
-    Serial.println(dac_enabled ? "ON" : "OFF");
-    Serial.print("[LOOP] DAC code: 0x");
-    Serial.println(dac_code, HEX);
+  //   Serial.print("[LOOP] Enable bit: ");
+  //   Serial.println(dac_enabled ? "ON" : "OFF");
+  //   Serial.print("[LOOP] DAC code: 0x");
+  //   Serial.println(dac_code, HEX);
 
-    if (dac_enabled && dac_code == 0x20) {
-      Serial.println("[LOOP] CAP DAC A set correctly.");
-    } else {
-      Serial.println("[LOOP] CAP DAC A setting did NOT persist!");
-      while(1);
-    }
-  } else {
-    Serial.print("[LOOP] Failed to read CAP DAC A, error: ");
-    Serial.println(ret);
-    while(1);
-  }
+  //   if (dac_enabled && dac_code == 0x20) {
+  //     Serial.println("[LOOP] CAP DAC A set correctly.");
+  //   } else {
+  //     Serial.println("[LOOP] CAP DAC A setting did NOT persist!");
+  //     while(1);
+  //   }
+  // } else {
+  //   Serial.print("[LOOP] Failed to read CAP DAC A, error: ");
+  //   Serial.println(ret);
+  //   while(1);
+  // }
 
+  // // check the sampling rate
+  // uint8_t cfg_reg;
+  // int32_t ret;
+
+  // // Read the configuration register
+  // ret = ad7746_reg_read(adc, AD7746_REG_CFG, &cfg_reg, 1);
+  // if (ret == 0) {
+  //     // Extract the CAPF bits (bits 3 to 5)
+  //     uint8_t capf_index = (cfg_reg >> 3) & 0x07;
+
+  //     // Optional: print out the actual frequency
+  //     const uint8_t cap_filter_rate_table[][2] = {
+  //         {91, 12}, {84, 13}, {50, 21}, {26, 39},
+  //         {16, 63}, {13, 78}, {11, 93}, {9, 111}
+  //     };
+
+  //     Serial.print(F("Current capf index: "));
+  //     Serial.println(capf_index);
+  //     Serial.print(F("→ Sampling rate: "));
+  //     Serial.print(cap_filter_rate_table[capf_index][0]);
+  //     Serial.println(F(" Hz"));
+  // } else {
+  //     Serial.println(F("Failed to read config register"));
+  // }
+
+  unsigned long micros_now = micros();
+  float time_sec = micros_now / 1e6;
+  Serial.print("T_before:");
+  Serial.println(time_sec, 6);
+  
   ret = ad7746_get_cap_data(adc, &capData);
+
+  // Print current time in seconds with 6 decimal places
+  micros_now = micros();
+  time_sec = micros_now / 1e6;
+  Serial.print("T_after:");
+  Serial.println(time_sec, 6);
+  
+  // commented trying to improve efficiency
   if (ret != 0) {
     Serial.print("Error reading capacitance: ");
     Serial.println(ret);
     while (1);
   } else {
     float cap_pf = ((int32_t)(capData & 0xFFFFFF) - 0x800000) * 8.192f / 16777216.0f;
-    Serial.print("Capacitance (pF): ");
+    Serial.print("Capacitance (pF):");
     Serial.println(cap_pf, 6);
   }
 
-  // delay(25);
-  // Print current time in seconds with 6 decimal places
-  unsigned long micros_now = micros();
-  float time_sec = micros_now / 1e6;
-  Serial.print("TIME:");
-  Serial.println(time_sec, 6);  // e.g., TIME:3.152365
+  
 
-  delay(2000);
+  // delay();
+  
+
 }
