@@ -437,9 +437,17 @@ extern void debug_log(const char*, uint8_t);
      if (!dev)
          return -EINVAL; // Return error if device pointer is invalid
  
-     // Prepare the DAC A register value
-     reg = no_os_field_prep(AD7746_CAPDAC_DACEN_MSK, enable) |
-           no_os_field_prep(AD7746_CAPDAC_DACP_MSK, code);
+     // Prepare the DAC A register value, Official
+    //  reg = no_os_field_prep(AD7746_CAPDAC_DACEN_MSK, enable) |
+    //        no_os_field_prep(AD7746_CAPDAC_DACP_MSK, code);
+
+    // temporary fix
+    reg = (enable ? 0x80 : 0x00) | (code & 0x7F);
+
+
+    // temporaty debug print
+    debug_print("[DEBUG] Writing CAPDAC A:");
+    debug_print_hex(reg);
  
      // Write the DAC A register
      return ad7746_reg_write(dev, AD7746_REG_CAPDACA, &reg, 1);
