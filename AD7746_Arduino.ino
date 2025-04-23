@@ -1,133 +1,112 @@
-// Arduino sketch to configure and read capacitance from AD7746 using Analog Devices no-OS driver
-// Dependencies: ad7746 driver, no_os_delay, no_os_i2c, no_os_util, no_os_alloc must be available in the Arduino libraries folder
-
-extern "C" {
+extern "C"{
   #include "ad7746.h"
   #include "no_os_delay.h"
   #include "no_os_i2c.h"
-  #include "no_os_util.h"
   #include "no_os_alloc.h"
+  #include "iio_ad7746.h"
 }
+// extern "C" {
+//   #include "platform_support/i2c_platform.h" // Replace with your platform-specific I2C implementation
+//   #include "platform_support/uart_platform.h"
+// }
 
-// Global device instance pointer
-ad7746_dev* dev;
+ad7746_dev *adc;
 
 void setup() {
   Serial.begin(115200);
-  delay(1000);
-  Serial.println("AD7746 Initialization...");
+  while (!Serial);
 
-  // --------------------------------------------------------
-  // 1. I2C configuration for Arduino Uno
-  // (AD7746 uses I2C communication)
-  // --------------------------------------------------------
+  Serial.println("[INIT] Starting AD7746 setup...");
+
+  // I2C setup
   no_os_i2c_init_param i2c_init;
-  i2c_init.device_id = 0;                      // Not used for Arduino
-  i2c_init.slave_address = AD7746_ADDRESS;     // Default AD7746 I2C address
-  i2c_init.platform_ops = NULL;                // Platform ops (not needed for basic Arduino)
+  i2c_init.max_speed_hz = 100000;
+  i2c_init.slave_address = AD7746_ADDRESS;
+  i2c_init.platform_ops = NULL;
+  i2c_init.extra = NULL;
 
-  // --------------------------------------------------------
-  // 2. Capacitance measurement channel settings
-  // (Choose CIN1 or CIN2, single-ended or differential)
-  // --------------------------------------------------------
-  ad7746_cap cap_settings;
-  cap_settings.capen = true;       // Enable capacitance measurement
-  cap_settings.cin2 = false;       // false = CIN1, true = CIN2
-  cap_settings.capdiff = false;    // false = single-ended, true = differential
-  cap_settings.capchop = false;    // No chopping
-
-  // --------------------------------------------------------
-  // 3. VT (Voltage/Temp) settings
-  // (Disable for pure capacitance usage)
-  // --------------------------------------------------------
-  ad7746_vt vt_settings;
-  vt_settings.vten = false;
-  vt_settings.vtmd = AD7746_VTMD_INT_TEMP;
-  vt_settings.extref = false;
-  vt_settings.vtshort = false;
-  vt_settings.vtchop = false;
-
-  // --------------------------------------------------------
-  // 4. Filter and mode settings
-  // (Controls the sampling rate and measurement mode)
-  // --------------------------------------------------------
-  ad7746_config config_settings;
-  config_settings.vtf = 0;                 // Not used (since VT is disabled)
-  config_settings.capf = 2;                // Filter index 2 = 50Hz sample rate
-  config_settings.md = AD7746_MODE_CONT;   // Continuous measurement mode
-
-  // --------------------------------------------------------
-  // 5. Combine into full setup struct
-  // --------------------------------------------------------
-  ad7746_setup setup;
-  setup.cap = cap_settings;
-  setup.vt = vt_settings;
-  setup.config = config_settings;
-  memset(&setup.exc, 0, sizeof(setup.exc));  // Clear excitation settings (not used here)
-
-  // --------------------------------------------------------
-  // 6. Final AD7746 initialization parameters
-  // --------------------------------------------------------
+  // AD7746 setup
   ad7746_init_param init_param;
   init_param.i2c_init = i2c_init;
   init_param.id = ID_AD7746;
-  init_param.setup = setup;
 
-  // --------------------------------------------------------
-  // 7. Initialize the AD7746 device
-  // --------------------------------------------------------
-  if (ad7746_init(&dev, &init_param) != 0) {
-    Serial.println("AD7746 init failed!");
-    while (1); // Halt if init fails
+  init_param.setup.cap.capen = true;
+  init_param.setup.cap.cin2 = false;
+  init_param.setup.cap.capdiff = false;
+  init_param.setup.cap.capchop = true;
+
+  // init_param.setup.vt.vten = true;
+  // init_param.setup.vt.vtmd = AD7746_VTMD_INT_TEMP;
+  // init_param.setup.vt.extref = false;
+  // init_param.setup.vt.vtshort = false;
+  // init_param.setup.vt.vtchop = true;
+
+  init_param.setup.exc.clkctrl = false;
+  init_param.setup.exc.excon = true;
+  init_param.setup.exc.excb = AD7746_EXC_PIN_DISABLED;
+  init_param.setup.exc.exca = AD7746_EXC_PIN_NORMAL;
+  init_param.setup.exc.exclvl = AD7746_EXCLVL_1_DIV_8;
+
+  init_param.setup.config.vtf = 0;
+  init_param.setup.config.capf = 0;
+  init_param.setup.config.md = AD7746_MODE_CONT;
+
+  int32_t ret = ad7746_init(&adc, &init_param);
+  if (ret != 0) {
+    Serial.print("AD7746 init failed: ");
+    Serial.println(ret);
+    while (1);
   }
 
-  // --------------------------------------------------------
-  // 8. Apply cap and config settings (safety)
-  // --------------------------------------------------------
-  ad7746_set_cap(dev, cap_settings);
-  ad7746_set_config(dev, config_settings);
+  uint8_t cap_setup = 0x81;  // CAPEN = 1, use CIN1
+  uint8_t exc_setup = 0x8A;  // EXCA enabled, EXCLVL = VDD (10)
+  uint8_t config    = 0x01;  // Continuous conversion
+  uint8_t cap_dac   = 0x00;  // No offset (you can change this)
 
-  // --------------------------------------------------------
-  // 9. Set CAPDAC (offset capacitor) — optional
-  // (This shifts the input range to prevent saturation)
-  // --------------------------------------------------------
-  ad7746_set_cap_dac_a(dev, true, 10);  // Enable DAC A with code 10 (~1.65pF)
-  ad7746_set_cap_dac_b(dev, false, 0);  // Disable DAC B
+  ad7746_reg_write(adc, AD7746_REG_CAP_SETUP, &cap_setup, 1);
+  ad7746_reg_write(adc, AD7746_REG_EXC_SETUP, &exc_setup, 1);
+  // ad7746_reg_write(adc, AD7746_REG_CONFIGURATION, &config, 1);
+  // ad7746_reg_write(adc, AD7746_REG_CAP_DAC_A, &cap_dac, 1);
 
-  Serial.println("AD7746 Initialized and Ready.");
+
+  Serial.println("[INIT] AD7746 init done.");
+
+  // Optional: set CAP DAC A
+  ad7746_set_cap_dac_a(adc, true, 0x42);
+  Serial.println("[INIT] CAP DAC A set.");
 }
 
 
 void loop() {
-  uint32_t cap_raw = 0;
-  int32_t result = ad7746_get_cap_data(dev, &cap_raw);
+  uint32_t capData = 0;
+  uint32_t temperature = 0;
+  int32_t ret;
 
-  if (result == 0) {
-    // Raw value is 24-bit signed (2's complement)
-    int32_t signed_cap = (cap_raw & 0xFFFFFF);
-    if (signed_cap & 0x800000) {
-      signed_cap |= 0xFF000000; // Sign extend to 32 bits
-    }
+  Serial.println("in the loop");
 
-    // Convert to farads: Full scale = 8.192pF => LSB = 8.192 / 2^24 pF
-    // Convert to farads directly:
-    float capacitance = signed_cap * (8.192e-12f / 16777216.0f);
+  // code for debug
+  Serial.println("Register dump:");
 
-    // Get current time (in seconds + microseconds)
-    unsigned long micros_now = micros();
-    unsigned long secs = micros_now / 1000000;
-    unsigned long usecs = micros_now % 1000000;
-
-    Serial.print("[Time: ");
-    Serial.print(secs);
-    Serial.print(".");
-    Serial.print(usecs);
-    Serial.print(" s] Capacitance = ");
-    Serial.print(capacitance, 15); // Print with high precision
-    Serial.println(" F");
-  } else {
-    Serial.println("Failed to read capacitance.");
+  for (uint8_t addr = 0x00; addr <= 0x0F; addr++) {
+    uint8_t val = 0;
+    ad7746_reg_read(adc, addr, &val, 1);
+    Serial.print("Reg 0x");
+    Serial.print(addr, HEX);
+    Serial.print(": 0x");
+    Serial.println(val, HEX);
   }
 
-  delay(100); // Read every 100 ms
+// debug end
+
+  ret = ad7746_get_cap_data(adc, &capData);
+  if (ret != 0) {
+    Serial.print("Error reading capacitance: ");
+    Serial.println(ret);
+  } else {
+    float cap_pf = ((int32_t)(capData & 0xFFFFFF) - 0x800000) * 8.192f / 16777216.0f;
+    Serial.print("Capacitance (pF): ");
+    Serial.println(cap_pf, 6);
+  }
+
+  delay(200);
 }
