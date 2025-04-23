@@ -77,6 +77,34 @@ void setup() {
   // Optional: set CAP DAC A
   ad7746_set_cap_dac_a(adc, true, 0x28);
   Serial.println("[INIT] CAP DAC A set.");
+
+  // tryout setting capf
+  uint8_t cfg_reg;
+
+  // Print the config register address
+  Serial.print(F("AD7746_REG_CFG address: 0x"));
+  Serial.println(AD7746_REG_CFG, HEX);
+
+  // Step 1: Read current config register
+  ret = ad7746_reg_read(adc, AD7746_REG_CFG, &cfg_reg, 1);
+  if (ret != 0) {
+      Serial.println(F("Failed to read config register"));
+      return;
+  }
+
+  // Step 2: Clear bits 5:3 (CAPF field)s
+  cfg_reg &= ~(0b111 << 3);  // Clear bits 5,4,3
+
+  // Step 3: Set capf
+  cfg_reg |= (0 << 3);       // Set bits 5:3
+
+  // Step 4: Write back to config register
+  ret = ad7746_reg_write(adc, AD7746_REG_CFG, &cfg_reg, 1);
+  if (ret != 0) {
+      Serial.println(F("[INIT]Failed to write config register"));
+  } else {
+      Serial.println(F("[INIT]Successfully set CAPF to 0"));
+  }
 }
 
   // CapDAC Code (dec)	CapDAC Code (hex)	cap_dac value (with enable)	Offset Capacitance (pF)
@@ -152,42 +180,49 @@ void loop() {
   // }
 
   // check the sampling rate
-  uint8_t cfg_reg;
-  int32_t ret;
+  // uint8_t cfg_reg;
+  // int32_t ret;
 
-  // Read the configuration register
-  ret = ad7746_reg_read(adc, AD7746_REG_CFG, &cfg_reg, 1);
-  if (ret == 0) {
-      // Extract the CAPF bits (bits 3 to 5)
-      uint8_t capf_index = (cfg_reg >> 3) & 0x07;
+  // --- Read AD7746_REG_CFG and print its contents ---
+  // uint8_t cfg_val = 0;
+  // int32_t ret = ad7746_reg_read(adc, AD7746_REG_CFG, &cfg_val, 1);
 
-      // Optional: print out the actual frequency
-      const uint8_t cap_filter_rate_table[][2] = {
-          {91, 12}, {84, 13}, {50, 21}, {26, 39},
-          {16, 63}, {13, 78}, {11, 93}, {9, 111}
-      };
+  //   if (ret == 0) {
+  //       // Print bits
+  //       Serial.print(F("AD7746_REG_CFG [0x0A] = 0b"));
+  //       for (int8_t i = 7; i >= 0; --i) {
+  //           Serial.print((cfg_val >> i) & 1);
+  //       }
+  //       Serial.println();
 
-      Serial.print(F("Current capf index: "));
-      Serial.println(capf_index);
-      Serial.print(F("→ Sampling rate: "));
-      Serial.print(cap_filter_rate_table[capf_index][0]);
-      Serial.println(F(" Hz"));
-  } else {
-      Serial.println(F("Failed to read config register"));
-  }
+  //       // Decode fields
+  //       uint8_t capf = (cfg_val >> 3) & 0x07;
+  //       Serial.print(F("  → CAPF index = "));
+  //       Serial.println(capf);
 
-  unsigned long micros_now = micros();
-  float time_sec1 = micros_now / 1e6;
+  //       const uint8_t cap_filter_rate_table[][2] = {
+  //           {91, 12}, {84, 13}, {50, 21}, {26, 39},
+  //           {16, 63}, {13, 78}, {11, 93}, {9, 111}
+  //       };
+  //       Serial.print(F("  → Sampling rate: "));
+  //       Serial.print(cap_filter_rate_table[capf][0]);
+  //       Serial.println(F(" Hz"));
+  //   } else {
+  //       Serial.println(F("Failed to read AD7746_REG_CFG"));
+  //   }
+
+  // unsigned long micros_now = micros();
+  // float time_sec1 = micros_now / 1e6;
   // Serial.print("T_before:");
   // Serial.println(time_sec1, 6);
   
   ret = ad7746_get_cap_data(adc, &capData);
 
   // Print current time in seconds with 6 decimal places
-  micros_now = micros();
-  float time_sec2 = micros_now / 1e6;
-  Serial.print("delta_T:");
-  Serial.println(time_sec2-time_sec1, 6);
+  // micros_now = micros();
+  // float time_sec2 = micros_now / 1e6;
+  // Serial.print("delta_T:");
+  // Serial.println(time_sec2-time_sec1, 6);
   
   if (ret != 0) {
     Serial.print("Error reading capacitance: ");
@@ -201,7 +236,7 @@ void loop() {
 
   
 
-  // delay();
+  // delay(50);
   
 
 }
