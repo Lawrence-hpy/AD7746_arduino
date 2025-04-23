@@ -51,7 +51,7 @@ void setup() {
   init_param.setup.exc.exclvl = AD7746_EXCLVL_1_DIV_8;
 
   init_param.setup.config.vtf = 0;
-  init_param.setup.config.capf = 0;
+  init_param.setup.config.capf = 3;
   init_param.setup.config.md = AD7746_MODE_CONT;
 
   ret = ad7746_init(&adc, &init_param);
@@ -75,7 +75,7 @@ void setup() {
   Serial.println("[INIT] AD7746 init done.");
 
   // Optional: set CAP DAC A
-  ad7746_set_cap_dac_a(adc, true, 0x00);
+  ad7746_set_cap_dac_a(adc, true, 0x28);
   Serial.println("[INIT] CAP DAC A set.");
 }
 
@@ -177,19 +177,18 @@ void loop() {
   // }
 
   unsigned long micros_now = micros();
-  float time_sec = micros_now / 1e6;
-  Serial.print("T_before:");
-  Serial.println(time_sec, 6);
+  float time_sec1 = micros_now / 1e6;
+  // Serial.print("T_before:");
+  // Serial.println(time_sec1, 6);
   
   ret = ad7746_get_cap_data(adc, &capData);
 
   // Print current time in seconds with 6 decimal places
   micros_now = micros();
-  time_sec = micros_now / 1e6;
-  Serial.print("T_after:");
-  Serial.println(time_sec, 6);
+  float time_sec2 = micros_now / 1e6;
+  Serial.print("delta_T:");
+  Serial.println(time_sec2-time_sec1, 6);
   
-  // commented trying to improve efficiency
   if (ret != 0) {
     Serial.print("Error reading capacitance: ");
     Serial.println(ret);

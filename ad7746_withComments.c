@@ -694,129 +694,129 @@ extern void debug_log(const char*, uint8_t);
  
 //      return 0;
 //  }
-int32_t ad7746_get_cap_data(struct ad7746_dev *dev, uint32_t *cap_data)
-{
-    int32_t ret;
-
-    // Capture absolute time before any operation
-    unsigned long t0 = micros();
-
-    // Validate input parameters
-    if (!dev || !cap_data)
-        return -EINVAL;
-
-    unsigned long t1 = micros();
-
-    // Clear the buffer
-    memset(dev->buf, 0, 3);
-    unsigned long t2 = micros();
-
-    // Wait until the capacitive data is ready
-    dev->buf[0] = AD7746_STATUS_RDYCAP_MSK;
-    while (dev->buf[0] & AD7746_STATUS_RDYCAP_MSK) {
-        ret = ad7746_reg_read(dev, AD7746_REG_STATUS, dev->buf, 1);
-        if (ret < 0)
-            return ret;
-    }
-    unsigned long t3 = micros();
-
-    // Read the capacitive data
-    ret = ad7746_reg_read(dev, AD7746_REG_CAP_DATA_HIGH, dev->buf, 3);
-    if (ret < 0)
-        return ret;
-    unsigned long t4 = micros();
-
-    // Combine the 3-byte data into a 32-bit value
-    *cap_data = ((uint32_t)dev->buf[0] << 16) |
-                ((uint32_t)dev->buf[1] << 8) |
-                dev->buf[2];
-    unsigned long t5 = micros();
-
-    // Reset the mode to idle if in single conversion mode
-    if (dev->setup.config.md == AD7746_MODE_SINGLE)
-        dev->setup.config.md = AD7746_MODE_IDLE;
-
-    unsigned long t6 = micros();
-
-    // Debug timing output
-    char buf[64];
-    snprintf(buf, sizeof(buf), "T0: %lu us", t0); debug_print(buf);
-    snprintf(buf, sizeof(buf), "T1: %lu us", t1); debug_print(buf);
-    snprintf(buf, sizeof(buf), "T2: %lu us", t2); debug_print(buf);
-    snprintf(buf, sizeof(buf), "T3: %lu us", t3); debug_print(buf);
-    snprintf(buf, sizeof(buf), "T4: %lu us", t4); debug_print(buf);
-    snprintf(buf, sizeof(buf), "T5: %lu us", t5); debug_print(buf);
-    snprintf(buf, sizeof(buf), "T6: %lu us", t6); debug_print(buf);
-
-    // Optional: show deltas for analysis
-    snprintf(buf, sizeof(buf), "Δt_status_polling: %lu us", t3 - t2); debug_print(buf);
-    snprintf(buf, sizeof(buf), "Δt_data_read: %lu us", t4 - t3); debug_print(buf);
-    snprintf(buf, sizeof(buf), "Δt_combine: %lu us", t5 - t4); debug_print(buf);
-    snprintf(buf, sizeof(buf), "Δt_total: %lu us", t6 - t0); debug_print(buf);
-
-    return 0;
-}
-
-
-// /***************************************************************************//**
-//   * @brief Waits until a conversion on the capacitive channel has been
-//   *        finished and returns the output data. Peiyu's code for debugging
-//   *
-//   * @param dev - Device descriptor pointer.
-//   * @param cap_data - The content of the Capacitive Data register.
-//   *
-//   * @return return code.
-//   *         Example: -EINVAL - Wrong input values.
-//   *                  -EIO - I2C Communication error.
-//   *                  0 - No errors encountered.
-//  *******************************************************************************/
 // int32_t ad7746_get_cap_data(struct ad7746_dev *dev, uint32_t *cap_data)
 // {
 //     int32_t ret;
 
-//     debug_print("[CHECKPOINT 1] Entering get_cap_data");
+//     // Capture absolute time before any operation
+//     unsigned long t0 = micros();
 
-//     if (!dev || !cap_data) {
-//         debug_print("[ERROR] Null pointer in get_cap_data");
+//     // Validate input parameters
+//     if (!dev || !cap_data)
 //         return -EINVAL;
-//     }
 
+//     unsigned long t1 = micros();
+
+//     // Clear the buffer
 //     memset(dev->buf, 0, 3);
+//     unsigned long t2 = micros();
 
-//     debug_print("[CHECKPOINT 2] Starting STATUS polling");
-
+//     // Wait until the capacitive data is ready
 //     dev->buf[0] = AD7746_STATUS_RDYCAP_MSK;
-//     uint32_t timeout = 0;
 //     while (dev->buf[0] & AD7746_STATUS_RDYCAP_MSK) {
 //         ret = ad7746_reg_read(dev, AD7746_REG_STATUS, dev->buf, 1);
-//         if (ret < 0) {
-//             debug_print("[ERROR] Failed to read STATUS register");
+//         if (ret < 0)
 //             return ret;
-//         }
-
-//         timeout++;
-//         if (timeout > 100000) {
-//             debug_print("[ERROR] Timeout waiting for RDYCAP to clear");
-//             return -EIO;
-//         }
 //     }
+//     unsigned long t3 = micros();
 
-//     debug_print("[CHECKPOINT 3] RDYCAP cleared. Reading data...");
-
+//     // Read the capacitive data
 //     ret = ad7746_reg_read(dev, AD7746_REG_CAP_DATA_HIGH, dev->buf, 3);
-//     if (ret < 0) {
-//         debug_print("[ERROR] Failed to read CAP_DATA");
+//     if (ret < 0)
 //         return ret;
-//     }
+//     unsigned long t4 = micros();
 
+//     // Combine the 3-byte data into a 32-bit value
 //     *cap_data = ((uint32_t)dev->buf[0] << 16) |
 //                 ((uint32_t)dev->buf[1] << 8) |
 //                 dev->buf[2];
+//     unsigned long t5 = micros();
 
-//     debug_print("[CHECKPOINT 4] Data read successfully");
+//     // Reset the mode to idle if in single conversion mode
+//     if (dev->setup.config.md == AD7746_MODE_SINGLE)
+//         dev->setup.config.md = AD7746_MODE_IDLE;
+
+//     unsigned long t6 = micros();
+
+//     // Debug timing output
+//     char buf[64];
+//     snprintf(buf, sizeof(buf), "T0: %lu us", t0); debug_print(buf);
+//     snprintf(buf, sizeof(buf), "T1: %lu us", t1); debug_print(buf);
+//     snprintf(buf, sizeof(buf), "T2: %lu us", t2); debug_print(buf);
+//     snprintf(buf, sizeof(buf), "T3: %lu us", t3); debug_print(buf);
+//     snprintf(buf, sizeof(buf), "T4: %lu us", t4); debug_print(buf);
+//     snprintf(buf, sizeof(buf), "T5: %lu us", t5); debug_print(buf);
+//     snprintf(buf, sizeof(buf), "T6: %lu us", t6); debug_print(buf);
+
+//     // Optional: show deltas for analysis
+//     snprintf(buf, sizeof(buf), "Δt_status_polling: %lu us", t3 - t2); debug_print(buf);
+//     snprintf(buf, sizeof(buf), "Δt_data_read: %lu us", t4 - t3); debug_print(buf);
+//     snprintf(buf, sizeof(buf), "Δt_combine: %lu us", t5 - t4); debug_print(buf);
+//     snprintf(buf, sizeof(buf), "Δt_total: %lu us", t6 - t0); debug_print(buf);
 
 //     return 0;
 // }
+
+
+/***************************************************************************//**
+  * @brief Waits until a conversion on the capacitive channel has been
+  *        finished and returns the output data. Peiyu's code for debugging
+  *
+  * @param dev - Device descriptor pointer.
+  * @param cap_data - The content of the Capacitive Data register.
+  *
+  * @return return code.
+  *         Example: -EINVAL - Wrong input values.
+  *                  -EIO - I2C Communication error.
+  *                  0 - No errors encountered.
+ *******************************************************************************/
+int32_t ad7746_get_cap_data(struct ad7746_dev *dev, uint32_t *cap_data)
+{
+    int32_t ret;
+
+    // debug_print("[CHECKPOINT 1] Entering get_cap_data");
+
+    if (!dev || !cap_data) {
+        debug_print("[ERROR] Null pointer in get_cap_data");
+        return -EINVAL;
+    }
+
+    memset(dev->buf, 0, 3);
+
+    // debug_print("[CHECKPOINT 2] Starting STATUS polling");
+
+    dev->buf[0] = AD7746_STATUS_RDYCAP_MSK;
+    uint32_t timeout = 0;
+    while (dev->buf[0] & AD7746_STATUS_RDYCAP_MSK) {
+        ret = ad7746_reg_read(dev, AD7746_REG_STATUS, dev->buf, 1);
+        if (ret < 0) {
+            debug_print("[ERROR] Failed to read STATUS register");
+            return ret;
+        }
+
+        timeout++;
+        if (timeout > 100000) {
+            debug_print("[ERROR] Timeout waiting for RDYCAP to clear");
+            return -EIO;
+        }
+    }
+
+    // debug_print("[CHECKPOINT 3] RDYCAP cleared. Reading data...");
+
+    ret = ad7746_reg_read(dev, AD7746_REG_CAP_DATA_HIGH, dev->buf, 3);
+    if (ret < 0) {
+        debug_print("[ERROR] Failed to read CAP_DATA");
+        return ret;
+    }
+
+    *cap_data = ((uint32_t)dev->buf[0] << 16) |
+                ((uint32_t)dev->buf[1] << 8) |
+                dev->buf[2];
+
+    // debug_print("[CHECKPOINT 4] Data read successfully");
+
+    return 0;
+}
 
 
 
