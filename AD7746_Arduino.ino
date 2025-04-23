@@ -51,7 +51,7 @@ void setup() {
   init_param.setup.exc.exclvl = AD7746_EXCLVL_1_DIV_8;
 
   init_param.setup.config.vtf = 0;
-  init_param.setup.config.capf = 3;
+  init_param.setup.config.capf = 7;
   init_param.setup.config.md = AD7746_MODE_CONT;
 
   ret = ad7746_init(&adc, &init_param);
@@ -151,30 +151,30 @@ void loop() {
   //   while(1);
   // }
 
-  // // check the sampling rate
-  // uint8_t cfg_reg;
-  // int32_t ret;
+  // check the sampling rate
+  uint8_t cfg_reg;
+  int32_t ret;
 
-  // // Read the configuration register
-  // ret = ad7746_reg_read(adc, AD7746_REG_CFG, &cfg_reg, 1);
-  // if (ret == 0) {
-  //     // Extract the CAPF bits (bits 3 to 5)
-  //     uint8_t capf_index = (cfg_reg >> 3) & 0x07;
+  // Read the configuration register
+  ret = ad7746_reg_read(adc, AD7746_REG_CFG, &cfg_reg, 1);
+  if (ret == 0) {
+      // Extract the CAPF bits (bits 3 to 5)
+      uint8_t capf_index = (cfg_reg >> 3) & 0x07;
 
-  //     // Optional: print out the actual frequency
-  //     const uint8_t cap_filter_rate_table[][2] = {
-  //         {91, 12}, {84, 13}, {50, 21}, {26, 39},
-  //         {16, 63}, {13, 78}, {11, 93}, {9, 111}
-  //     };
+      // Optional: print out the actual frequency
+      const uint8_t cap_filter_rate_table[][2] = {
+          {91, 12}, {84, 13}, {50, 21}, {26, 39},
+          {16, 63}, {13, 78}, {11, 93}, {9, 111}
+      };
 
-  //     Serial.print(F("Current capf index: "));
-  //     Serial.println(capf_index);
-  //     Serial.print(F("→ Sampling rate: "));
-  //     Serial.print(cap_filter_rate_table[capf_index][0]);
-  //     Serial.println(F(" Hz"));
-  // } else {
-  //     Serial.println(F("Failed to read config register"));
-  // }
+      Serial.print(F("Current capf index: "));
+      Serial.println(capf_index);
+      Serial.print(F("→ Sampling rate: "));
+      Serial.print(cap_filter_rate_table[capf_index][0]);
+      Serial.println(F(" Hz"));
+  } else {
+      Serial.println(F("Failed to read config register"));
+  }
 
   unsigned long micros_now = micros();
   float time_sec1 = micros_now / 1e6;
