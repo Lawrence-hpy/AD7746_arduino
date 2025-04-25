@@ -711,7 +711,7 @@ extern void debug_log(const char*, uint8_t);
 //     memset(dev->buf, 0, 3);
 //     unsigned long t2 = micros();
 
-//     // Wait until the capacitive data is ready
+//     // Wait until the capacitive data is ready 
 //     dev->buf[0] = AD7746_STATUS_RDYCAP_MSK;
 //     while (dev->buf[0] & AD7746_STATUS_RDYCAP_MSK) {
 //         ret = ad7746_reg_read(dev, AD7746_REG_STATUS, dev->buf, 1);

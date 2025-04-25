@@ -61,10 +61,27 @@ void setup() {
     while (1);
   }
 
-  uint8_t cap_setup = 0x81;  // CAPEN = 1, use CIN1
-  uint8_t exc_setup = 0x8A;  // EXCA enabled, EXCLVL = VDD (10)
+  uint8_t cap_setup;  
+  uint8_t exc_setup;  
   // uint8_t config    = 0x01;  // Continuous conversion
   // uint8_t cap_dac   = 0x00;  // No offset (you can change this)
+
+  uint8_t CAPEN = 0b1;
+  uint8_t CIN2 = 0b0;
+  uint8_t CAPDIFF = 0b0;
+  uint8_t bitfourtoone = 0b0000;
+  uint8_t CAPCHOP = 0b0;
+  cap_setup = (CAPEN << 7) | (CIN2 << 6) | (CAPDIFF << 5) | (bitfourtoone << 1) | CAPCHOP; // check table 14 in handbook
+
+  uint8_t CLKCTRL = 0b0;
+  uint8_t EXCON = 0b0;
+  uint8_t EXCB = 0b1;
+  uint8_t EXCBB = 0b0;
+  uint8_t EXCA = 0b1;
+  uint8_t EXCAB = 0b0;
+  uint8_t EXCLVL1 = 0b0;
+  uint8_t EXCLVL0 = 0b0;
+  exc_setup = (CLKCTRL << 7) | (EXCON << 6) | (EXCB << 5) | (EXCBB << 4) | (EXCA << 3) | (EXCAB << 2) | (EXCLVL1 << 1) |(EXCLVL0 << 0); // check table 15 in handbook
 
   ad7746_reg_write(adc, AD7746_REG_CAP_SETUP, &cap_setup, 1);
   ad7746_reg_write(adc, AD7746_REG_EXC_SETUP, &exc_setup, 1);
@@ -92,11 +109,16 @@ void setup() {
       return;
   }
 
-  // Step 2: Clear bits 5:3 (CAPF field)s
-  cfg_reg &= ~(0b111 << 3);  // Clear bits 5,4,3
+  // // Step 2: Clear bits 5:3 (CAPF field)s
+  // cfg_reg &= ~(0b111 << 3);  // Clear bits 5,4,3
 
-  // Step 3: Set capf
-  cfg_reg |= (0 << 3);       // Set bits 5:3
+  // Step 3: Set capf, refer to 'AD7745_7746.pdf' table 18
+  uint8_t vtf = 0b00;  // Bits 7:6
+  uint8_t capf = 0b000; // Bits 5:3
+  uint8_t md   = 0b001; // Bits 2:0
+
+  cfg_reg = (vtf << 6) | (capf << 3) | md;
+
 
   // Step 4: Write back to config register
   ret = ad7746_reg_write(adc, AD7746_REG_CFG, &cfg_reg, 1);
@@ -211,28 +233,51 @@ void loop() {
   //       Serial.println(F("Failed to read AD7746_REG_CFG"));
   //   }
 
-  // unsigned long micros_now = micros();
-  // float time_sec1 = micros_now / 1e6;
-  // Serial.print("T_before:");
-  // Serial.println(time_sec1, 6);
-  
-  ret = ad7746_get_cap_data(adc, &capData);
+    // Read and print CLKCTRL
+    // uint8_t reg_val = 0;
+    // ret = ad7746_reg_read(adc, AD7746_REG_EXC_SETUP, &reg_val, 1);   
+    // if (ret == 0) {
+    //         // Print bits
+    //         Serial.print(F("AD7746_REG_EXC_SETUP [0x09] = 0b"));
+    //         for (int8_t i = 7; i >= 0; --i) {
+    //             Serial.print((reg_val >> i) & 1);
+    //         }
+    //         Serial.println(); 
+    // } else {
+    //         Serial.println(F("Failed to read AD7746_REG_EXC_SETU"));
+    // }
 
-  // Print current time in seconds with 6 decimal places
-  // micros_now = micros();
-  // float time_sec2 = micros_now / 1e6;
-  // Serial.print("delta_T:");
-  // Serial.println(time_sec2-time_sec1, 6);
-  
-  if (ret != 0) {
-    Serial.print("Error reading capacitance: ");
-    Serial.println(ret);
-    while (1);
-  } else {
-    float cap_pf = ((int32_t)(capData & 0xFFFFFF) - 0x800000) * 8.192f / 16777216.0f;
-    Serial.print("Capacitance (pF):");
-    Serial.println(cap_pf, 6);
-  }
+    // // Read and print AD7746_REG_CAP_SETUP
+    // uint8_t reg_val = 0;
+    // ret = ad7746_reg_read(adc, AD7746_REG_CAP_SETUP, &reg_val, 1);   
+    // if (ret == 0) {
+    //         // Print bits
+    //         Serial.print(F("AD7746_REG_CAP_SETUP [0x07] = 0b"));
+    //         for (int8_t i = 7; i >= 0; --i) {
+    //             Serial.print((reg_val >> i) & 1);
+    //         }
+    //         Serial.println(); 
+    // } else {
+    //         Serial.println(F("Failed to read AD7746_REG_CAP_SETUP"));
+    // }
+
+    ret = ad7746_get_cap_data(adc, &capData);
+
+    // Print current time in seconds with 6 decimal places
+    // micros_now = micros();
+    // float time_sec2 = micros_now / 1e6;
+    // Serial.print("delta_T:");
+    // Serial.println(time_sec2-time_sec1, 6);
+    
+    if (ret != 0) {
+      Serial.print("Error reading capacitance: ");
+      Serial.println(ret);
+      while (1);
+    } else {
+      float cap_pf = ((int32_t)(capData & 0xFFFFFF) - 0x800000) * 8.192f / 16777216.0f;
+      Serial.print("Capacitance (pF):");
+      Serial.println(cap_pf, 6);
+    }
 
   
 
