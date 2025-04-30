@@ -5,6 +5,9 @@ extern "C"{
   #include "no_os_alloc.h"
   #include "iio_ad7746.h"
 }
+
+#include "Wire.h"
+
 // extern "C" {
 //   #include "platform_support/i2c_platform.h" // Replace with your platform-specific I2C implementation
 //   #include "platform_support/uart_platform.h"
@@ -18,6 +21,7 @@ int32_t ret;
 void setup() {
   Serial.begin(115200);
   while (!Serial);
+  Wire.setClock(400000); // 400kHz I2C Fast Mode
 
   Serial.println("[INIT] Starting AD7746 setup...");
 
@@ -92,7 +96,7 @@ void setup() {
   Serial.println("[INIT] AD7746 init done.");
 
   // Optional: set CAP DAC A
-  ad7746_set_cap_dac_a(adc, true, 0x28);
+  ad7746_set_cap_dac_a(adc, true, 0x08);
   Serial.println("[INIT] CAP DAC A set.");
 
   // tryout setting capf
@@ -118,7 +122,6 @@ void setup() {
   uint8_t md   = 0b001; // Bits 2:0
 
   cfg_reg = (vtf << 6) | (capf << 3) | md;
-
 
   // Step 4: Write back to config register
   ret = ad7746_reg_write(adc, AD7746_REG_CFG, &cfg_reg, 1);
@@ -268,6 +271,7 @@ void loop() {
     // float time_sec2 = micros_now / 1e6;
     // Serial.print("delta_T:");
     // Serial.println(time_sec2-time_sec1, 6);
+    // Serial.println("Convert");
     
     if (ret != 0) {
       Serial.print("Error reading capacitance: ");
