@@ -96,7 +96,7 @@ void setup() {
   Serial.println("[INIT] AD7746 init done.");
 
   // Optional: set CAP DAC A
-  ad7746_set_cap_dac_a(adc, true, 0x08);
+  ad7746_set_cap_dac_a(adc, true, 0x18);
   Serial.println("[INIT] CAP DAC A set.");
 
   // tryout setting capf
